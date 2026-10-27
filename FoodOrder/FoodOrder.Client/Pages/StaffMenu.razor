@@ -1,0 +1,125 @@
+﻿@page "/etterem/etlap"
+@using System.ComponentModel.DataAnnotations
+@inject FoodOrderStore Store
+@implements IDisposable
+
+<PageTitle>Étlap Kezelése</PageTitle>
+
+<h2 class="mb-4">Étlap Kezelése (Éttermi nézet)</h2>
+
+@if (Store.CurrentRole != UserRole.Staff)
+{
+    <div class="alert alert-danger">Nincs jogosultságod ehhez az oldalhoz! (Válts éttermi dolgozóra)</div>
+}
+else
+{
+    <div class="card shadow-sm mb-5">
+        <div class="card-header bg-primary text-white fw-bold">Új étel felvétele</div>
+        <div class="card-body">
+            <EditForm Model="NewDish" OnValidSubmit="AddNewDish">
+                <DataAnnotationsValidator />
+
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Étel neve</label>
+                        <InputText class="form-control" @bind-Value="NewDish.Name" />
+                        <ValidationMessage For="@(() => NewDish.Name)" class="text-danger small" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Kategória</label>
+                        <InputText class="form-control" @bind-Value="NewDish.Category" placeholder="Pl. Leves, Főétel..." />
+                        <ValidationMessage For="@(() => NewDish.Category)" class="text-danger small" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Ár (Ft)</label>
+                        <InputNumber class="form-control" @bind-Value="NewDish.Price" />
+                        <ValidationMessage For="@(() => NewDish.Price)" class="text-danger small" />
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="submit" class="btn btn-success w-100 fw-bold">Mentés</button>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Leírás</label>
+                        <InputTextArea class="form-control" @bind-Value="NewDish.Description" rows="2" />
+                        <ValidationMessage For="@(() => NewDish.Description)" class="text-danger small" />
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+
+    <h4 class="mb-3">Meglévő ételek</h4>
+    <div class="table-responsive shadow-sm">
+        <table class="table table-striped align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Név</th>
+                    <th>Kategória</th>
+                    <th>Leírás</th>
+                    <th>Ár</th>
+                    <th class="text-center">Elérhető</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var dish in Store.Dishes)
+                {
+                    <tr>
+                        <td class="fw-bold">@dish.Name</td>
+                        <td><span class="badge bg-secondary">@dish.Category</span></td>
+                        <td class="small text-muted">@dish.Description</td>
+                        <td>@HufFormatter.Format(dish.Price)</td>
+                        <td class="text-center">
+                            <button class="btn btn-sm @(dish.IsAvailable ? "btn-outline-success" : "btn-outline-danger")"
+                                    @onclick="() => Store.ToggleDishAvailabilityAsync(dish.Id)">
+                                @(dish.IsAvailable ? "Igen (Kikapcsolás)" : "Nem (Bekapcsolás)")
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private DishFormModel NewDish = new();
+
+    protected override void OnInitialized()
+    {
+        Store.OnChange += StateHasChanged;
+    }
+
+    private async Task AddNewDish()
+    {
+        var dto = new DishDto
+        {
+            Name = NewDish.Name,
+            Category = NewDish.Category,
+            Description = NewDish.Description,
+            Price = NewDish.Price,
+            IsAvailable = true
+        };
+        await Store.AddDishAsync(dto);
+        NewDish = new DishFormModel(); // űrlap ürítése
+    }
+
+    public void Dispose()
+    {
+        Store.OnChange -= StateHasChanged;
+    }
+
+    public class DishFormModel
+    {
+        [Required(ErrorMessage = "A név kötelező!")]
+        public string Name { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "A kategória kötelező!")]
+        public string Category { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "A leírás kötelező!")]
+        public string Description { get; set; } = string.Empty;
+
+        [Range(1, 100000, ErrorMessage = "Az árnak 1 és 100 000 Ft között kell lennie!")]
+        public decimal Price { get; set; }
+    }
+}

@@ -1,0 +1,83 @@
+﻿@page "/etterem/rendelesek"
+@inject FoodOrderStore Store
+@implements IDisposable
+
+<PageTitle>Beérkezett Rendelések</PageTitle>
+
+<h2 class="mb-4">Beérkezett Rendelések (Éttermi nézet)</h2>
+
+@if (Store.CurrentRole != UserRole.Staff)
+{
+    <div class="alert alert-danger">Nincs jogosultságod ehhez az oldalhoz!</div>
+}
+else if (!Store.Orders.Any())
+{
+    <p class="text-muted">Nincsenek beérkezett rendelések.</p>
+}
+else
+{
+    <div class="row row-cols-1 g-4">
+        @foreach (var order in Store.Orders)
+        {
+            <div class="col">
+                <div class="card shadow-sm border-0 border-start border-5 border-primary">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                            <h5 class="mb-0 fw-bold">Rendelés: @order.OrderId</h5>
+                            <div>
+                                <span class="badge bg-primary fs-6">Leadva</span>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3 mb-md-0">
+                                <h6 class="text-muted fw-bold">Vásárló adatai:</h6>
+                                <p class="mb-1"><strong>Név:</strong> @order.CustomerName</p>
+                                <p class="mb-1"><strong>Cím:</strong> @order.DeliveryAddress</p>
+                                @if (!string.IsNullOrWhiteSpace(order.Notes))
+                                {
+                                    <p class="mb-1 text-danger small"><strong>Megjegyzés:</strong> @order.Notes</p>
+                                }
+                                <p class="mb-0 mt-2 small text-muted">@order.CreatedAt.ToString("yyyy. MM. dd. HH:mm:ss")</p>
+                            </div>
+
+                            <div class="col-md-8 bg-light p-3 rounded">
+                                <h6 class="text-muted fw-bold">Rendelt tételek:</h6>
+                                <table class="table table-sm table-borderless mb-0">
+                                    <tbody>
+                                        @foreach (var item in order.Items)
+                                        {
+                                            <tr>
+                                                <td class="fw-semibold">@item.Quantity x</td>
+                                                <td>@item.DishName</td>
+                                                <td class="text-end">@HufFormatter.Format(item.Price * item.Quantity)</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                    <tfoot class="border-top">
+                                        <tr>
+                                            <td colspan="2" class="fw-bold text-end pt-2">Végösszeg:</td>
+                                            <td class="fw-bold text-end pt-2 text-success fs-5">@HufFormatter.Format(order.TotalPrice)</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        Store.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        Store.OnChange -= StateHasChanged;
+    }
+}

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="FoodOrder.Shared/FoodOrder.Shared.csproj" />
+  <Project Path="FoodOrder/FoodOrder.Client/FoodOrder.Client.csproj" />
+  <Project Path="FoodOrder/FoodOrder/FoodOrder.csproj" />
+</Solution>
