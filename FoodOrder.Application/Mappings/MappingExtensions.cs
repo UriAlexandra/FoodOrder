@@ -1,3 +1,5 @@
+using FoodOrder.Application.Policies;
+using FoodOrder.Application.Ports;
 using FoodOrder.Domain.Entities;
 using FoodOrder.Domain.ValueObjects;
 using FoodOrder.Shared.Models;
@@ -24,7 +26,11 @@ public static class MappingExtensions
         IsActive = courier.IsActive
     };
 
-    public static OrderDto ToDto(this Order order, Courier? courier = null) => new()
+    /// <summary>
+    /// A rendelés a <paramref name="user"/> szemszögéből: a választható állapotokat és a futár-hozzárendelést
+    /// a szerepköre szerint kapja meg.
+    /// </summary>
+    public static OrderDto ToDto(this Order order, Courier? courier, ICurrentUser user) => new()
     {
         Id = order.Id,
         PlacedAt = order.PlacedAt,
@@ -39,16 +45,16 @@ public static class MappingExtensions
         Total = order.Total.Amount,
         Version = order.Version,
         IsFinal = order.Status.IsFinal,
-        CanAssignCourier = order.CanAssignCourier,
+        CanAssignCourier = user.IsStaff && order.CanAssignCourier,
         Items = order.Items.Select(i => new OrderItemDto
         {
             DishName = i.DishName,
             Price = i.UnitPrice.Amount,
             Quantity = i.Quantity
         }).ToList(),
-        // A választható következő állapotokat a domain adja (futár-feltétellel együtt),
+        // A választható következő állapotokat a domain és a szerepkör-szabály együtt adja,
         // így a kliensnek nincs saját átmenettáblája.
-        AllowedNextStatuses = order.GetAllowedNextStatuses()
+        AllowedNextStatuses = OrderStatusPolicy.AllowedNextFor(order, user)
             .Select(s => new StatusOptionDto { Code = s.Code, DisplayName = s.DisplayName })
             .ToList(),
         History = order.StatusHistory.Select(h => new StatusHistoryEntryDto

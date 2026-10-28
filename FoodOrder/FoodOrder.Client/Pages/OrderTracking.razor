@@ -1,4 +1,5 @@
 @page "/rendeleseim/{Id:int}"
+@attribute [Authorize(Roles = AppRoles.Customer)]
 @inject IOrderService OrderService
 @implements IDisposable
 
@@ -114,7 +115,7 @@ else
     private readonly CancellationTokenSource _cts = new();
     private PeriodicTimer? _timer;
 
-    // Lemondás csak akkor, ha a szerver felkínálja (Leadva vagy Elfogadva állapotban).
+    // Lemondás csak akkor, ha a szerver felkínálja: vásárlóként csak a saját, Leadva állapotú rendelésnél.
     private bool CanCancel =>
         _order?.AllowedNextStatuses.Any(s => s.Code == OrderStatusUi.Cancelled) == true;
 

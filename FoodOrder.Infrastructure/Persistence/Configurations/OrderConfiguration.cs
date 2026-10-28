@@ -12,6 +12,7 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.CustomerId).HasMaxLength(256).IsRequired();
+        builder.HasIndex(x => x.CustomerId); // a vásárló „Rendeléseim” listájához
         builder.Property(x => x.CustomerName).HasMaxLength(100).IsRequired();
         builder.Property(x => x.CustomerEmail).HasMaxLength(256).IsRequired();
         builder.Property(x => x.DeliveryAddress).HasMaxLength(200).IsRequired();

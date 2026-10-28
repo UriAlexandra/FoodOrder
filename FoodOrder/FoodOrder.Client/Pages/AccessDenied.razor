@@ -1,0 +1,36 @@
+@page "/hozzaferes-megtagadva"
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Hozzáférés megtagadva</PageTitle>
+
+<h2 class="mb-3">Hozzáférés megtagadva</h2>
+
+<div class="alert alert-danger" role="alert">Nincs jogosultságod ehhez az oldalhoz.</div>
+
+<AuthorizeView>
+    <Authorized>
+        <p>
+            Bejelentkezve: <strong>@context.User.Identity?.Name</strong>.
+            Ha másik fiókkal szeretnéd megnyitni az oldalt, jelentkezz ki, majd lépj be újra.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="@ReturnUrl.Resolve(null, AuthService.CurrentUser?.Roles ?? [])" class="btn btn-primary">Vissza a főoldalra</a>
+            <button type="button" class="btn btn-outline-secondary" @onclick="SwitchAccountAsync">Bejelentkezés másik fiókkal</button>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="bejelentkezes" class="btn btn-primary">Bejelentkezés</a>
+            <a href="" class="btn btn-outline-secondary">Vissza az étlapra</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private async Task SwitchAccountAsync()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("bejelentkezes");
+    }
+}

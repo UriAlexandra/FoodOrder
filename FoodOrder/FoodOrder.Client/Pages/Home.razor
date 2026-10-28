@@ -1,16 +1,21 @@
 @page "/"
 @inject IMenuService MenuService
 @inject ICartService CartService
-@inject ISessionService SessionService
-@implements IDisposable
+@inject NavigationManager Navigation
 
 <PageTitle>Étlap</PageTitle>
 
 <h2 class="mb-4">Étlap</h2>
 
-@if (SessionService.CurrentRole != UserRole.Customer)
+@if (_isStaff)
 {
-    <div class="alert alert-info">Éttermi dolgozóként nézed az étlapot. Rendeléshez válts vásárló szerepkörre.</div>
+    <div class="alert alert-info">Éttermi dolgozóként nézed az étlapot. Az ételeket az <a href="etterem/etlap">Étlap kezelése</a> oldalon módosíthatod.</div>
+}
+else if (!_isAuthenticated)
+{
+    <div class="alert alert-info">
+        Rendeléshez <a href="bejelentkezes">jelentkezz be</a>, vagy <a href="regisztracio">regisztrálj</a>.
+    </div>
 }
 
 @if (_addedMessage is not null)
@@ -37,7 +42,7 @@ else
         {
             <div class="col">
                 <DishCard Dish="dish"
-                          ShowCartActions="@(SessionService.CurrentRole == UserRole.Customer)"
+                          ShowCartActions="@(!_isStaff)"
                           OnAddToCart="HandleAddToCart" />
             </div>
         }
@@ -45,16 +50,25 @@ else
 }
 
 @code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthenticationState { get; set; }
+
     private bool _loading = true;
     private string? _error;
     private string? _addedMessage;
+    private bool _isAuthenticated;
+    private bool _isStaff;
 
     private IEnumerable<DishDto> AvailableDishes => MenuService.Dishes.Where(d => d.IsAvailable);
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    // Be- vagy kijelentkezéskor az új állapot paraméterként érkezik.
+    protected override async Task OnParametersSetAsync()
     {
-        SessionService.OnChange += StateHasChanged;
-        await LoadAsync();
+        var user = AuthenticationState is null ? null : (await AuthenticationState).User;
+        _isAuthenticated = user?.Identity?.IsAuthenticated == true;
+        _isStaff = user?.IsInRole(AppRoles.Staff) == true;
     }
 
     private async Task LoadAsync()
@@ -77,12 +91,14 @@ else
 
     private async Task HandleAddToCart((DishDto dish, int quantity) payload)
     {
+        // Bejelentkezés nélkül nincs kosár: a Kosárba gomb a bejelentkezésre visz, utána ide térünk vissza.
+        if (!_isAuthenticated)
+        {
+            Navigation.NavigateTo("bejelentkezes?returnUrl=%2F");
+            return;
+        }
+
         await CartService.AddToCartAsync(payload.dish, payload.quantity);
         _addedMessage = $"{payload.quantity} × {payload.dish.Name} a kosárba került.";
-    }
-
-    public void Dispose()
-    {
-        SessionService.OnChange -= StateHasChanged;
     }
 }

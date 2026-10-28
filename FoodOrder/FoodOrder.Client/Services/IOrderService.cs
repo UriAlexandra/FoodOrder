@@ -4,8 +4,8 @@ namespace FoodOrder.Client.Services;
 
 public interface IOrderService
 {
-    /// <param name="customerEmail">Ha meg van adva, csak ennek a vásárlónak a rendelései.</param>
-    Task<List<OrderDto>> GetOrdersAsync(string? customerEmail = null);
+    /// <summary>Dolgozónak minden rendelés, vásárlónak csak a sajátjai (a szerver szűr).</summary>
+    Task<List<OrderDto>> GetOrdersAsync();
     Task<OrderDto> GetOrderAsync(int orderId);
 
     /// <returns>Az új rendelés azonosítója.</returns>

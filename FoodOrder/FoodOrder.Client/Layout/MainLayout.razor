@@ -1,7 +1,8 @@
 @inherits LayoutComponentBase
-@inject ISessionService SessionService
 @inject ICartService CartService
 @inject IKeyValueStorage Storage
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
 
 <div class="page">
     <div class="sidebar">
@@ -10,16 +11,25 @@
 
     <main>
         <div class="top-row px-4 d-flex justify-content-between align-items-center gap-2 bg-light border-bottom">
-            <h5 class="mb-0 text-primary fw-bold d-none d-sm-block">FoodOrder</h5>
+            <span class="fs-5 mb-0 text-primary fw-bold d-none d-sm-inline">FoodOrder</span>
 
-            @if (_isInitialized)
-            {
-                <RoleSwitcher />
-            }
-        </div>
-
-        <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 py-2 px-4 small" role="note">
-            Fejlesztői változat – a szerepkörváltó még nem bejelentkezés
+            <AuthorizeView>
+                <Authorized>
+                    <div class="d-flex align-items-center gap-2 ms-auto user-box">
+                        <span class="text-truncate fw-semibold" title="@context.User.Identity?.Name">@context.User.Identity?.Name</span>
+                        <span class="badge text-bg-secondary d-none d-md-inline">
+                            @(context.User.IsInRole(AppRoles.Staff) ? "Éttermi dolgozó" : "Vásárló")
+                        </span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" @onclick="LogoutAsync">Kijelentkezés</button>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
+                    <div class="d-flex align-items-center gap-2 ms-auto">
+                        <a class="btn btn-sm btn-primary ms-0" href="bejelentkezes">Bejelentkezés</a>
+                        <a class="btn btn-sm btn-outline-primary ms-0" href="regisztracio">Regisztráció</a>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
 
         <article class="content px-4 py-4">
@@ -42,14 +52,19 @@
     {
         if (!firstRender) return;
 
-        // Az étlap és a rendelések már a szerveren vannak: a régi localStorage-kulcsokat töröljük.
-        await Storage.RemoveItemAsync(StorageKeys.LegacyDishes);
-        await Storage.RemoveItemAsync(StorageKeys.LegacyOrders);
+        // Korábbi hetek böngészőben tárolt adatai (étlap, rendelések, demó szerepkör, közös kosár) már nem kellenek.
+        foreach (var key in StorageKeys.Legacy)
+            await Storage.RemoveItemAsync(key);
 
-        await SessionService.InitializeAsync();
         await CartService.InitializeAsync();
 
         _isInitialized = true;
         StateHasChanged();
+    }
+
+    private async Task LogoutAsync()
+    {
+        await AuthService.LogoutAsync();
+        Navigation.NavigateTo("");
     }
 }

@@ -36,6 +36,14 @@ main {
         text-overflow: ellipsis;
     }
 
+.user-box {
+    min-width: 0;
+}
+
+    .user-box .text-truncate {
+        max-width: 16rem;
+    }
+
 @media (max-width: 640.98px) {
     .top-row {
         justify-content: space-between;

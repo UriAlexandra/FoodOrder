@@ -14,6 +14,7 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             InvalidStatusTransitionException e => Problem(StatusCodes.Status409Conflict, "Érvénytelen állapotváltás", e.Message),
             ConflictException e => Problem(StatusCodes.Status409Conflict, "Adatütközés", e.Message),
             NotFoundException e => Problem(StatusCodes.Status404NotFound, "Nem található", e.Message),
+            ForbiddenException e => Problem(StatusCodes.Status403Forbidden, "Nincs jogosultság", e.Message),
             DomainException e => Problem(StatusCodes.Status400BadRequest, "Érvénytelen adat", e.Message),
             BadHttpRequestException => Problem(StatusCodes.Status400BadRequest, "Hibás kérés", "A kérés formátuma nem megfelelő."),
             _ => null

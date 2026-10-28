@@ -43,6 +43,8 @@ public class ApiException(int statusCode, string message, IReadOnlyDictionary<st
     private static string DefaultMessage(int status) => status switch
     {
         400 => "Hibás kérés.",
+        401 => "A folytatáshoz jelentkezz be.",
+        403 => "Nincs jogosultságod ehhez a művelethez.",
         404 => "A kért adat nem található.",
         409 => "Az adat közben megváltozott, frissítsd az oldalt.",
         >= 500 => "Váratlan hiba történt a szerveren.",

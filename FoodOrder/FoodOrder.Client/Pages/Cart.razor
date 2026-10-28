@@ -1,20 +1,16 @@
 @page "/kosar"
+@attribute [Authorize(Roles = AppRoles.Customer)]
 @using System.ComponentModel.DataAnnotations
 @inject ICartService CartService
 @inject IMenuService MenuService
 @inject IOrderService OrderService
-@inject ISessionService SessionService
 @implements IDisposable
 
 <PageTitle>Kosár</PageTitle>
 
 <h2 class="mb-4">Kosár</h2>
 
-@if (SessionService.CurrentRole != UserRole.Customer)
-{
-    <div class="alert alert-warning">A kosár csak vásárlóként érhető el. Válts vásárló szerepkörre a felső sávban.</div>
-}
-else if (_placedOrderId is not null)
+@if (_placedOrderId is not null)
 {
     <div class="alert alert-success p-4 shadow-sm text-center" role="status">
         <h4 class="alert-heading">Köszönjük a rendelést!</h4>
@@ -115,7 +111,6 @@ else
     protected override async Task OnInitializedAsync()
     {
         CartService.OnChange += StateHasChanged;
-        SessionService.OnChange += StateHasChanged;
 
         // A kosárban tárolt ár és elérhetőség elavulhatott: frissítjük a szerver szerinti étlappal.
         await RefreshMenuAsync();
@@ -178,7 +173,6 @@ else
     public void Dispose()
     {
         CartService.OnChange -= StateHasChanged;
-        SessionService.OnChange -= StateHasChanged;
     }
 
     public class CheckoutModel

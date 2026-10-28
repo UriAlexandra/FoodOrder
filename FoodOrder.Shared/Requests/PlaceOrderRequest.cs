@@ -1,7 +1,10 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace FoodOrder.Shared.Requests;
 
+/// <summary>
+/// Új rendelés. A vásárló adatait (azonosító, név, e-mail) a szerver a bejelentkezett felhasználóból veszi.
+/// </summary>
 public class PlaceOrderRequest
 {
     [Required(ErrorMessage = "A szállítási cím megadása kötelező!")]
@@ -10,13 +13,6 @@ public class PlaceOrderRequest
 
     [MaxLength(300, ErrorMessage = "A megjegyzés maximum 300 karakter lehet.")]
     public string? Note { get; set; }
-
-    [Required(ErrorMessage = "Vásárló nevének megadása kötelező.")]
-    public string CustomerName { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Vásárló email címének megadása kötelező.")]
-    [EmailAddress(ErrorMessage = "Érvénytelen email formátum.")]
-    public string CustomerEmail { get; set; } = string.Empty;
 
     [Required]
     [MinLength(1, ErrorMessage = "A rendelésnek legalább egy tételt kell tartalmaznia.")]

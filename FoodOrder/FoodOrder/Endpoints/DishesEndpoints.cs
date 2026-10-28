@@ -12,15 +12,18 @@ public static class DishesEndpoints
         var group = app.MapGroup("/api/dishes").WithTags("Dishes");
 
         group.MapGet("/", async ([FromQuery] bool? onlyAvailable, GetMenuHandler handler, CancellationToken ct)
-            => Results.Ok(await handler.HandleAsync(onlyAvailable ?? false, ct)));
+            => Results.Ok(await handler.HandleAsync(onlyAvailable ?? false, ct)))
+            .AllowAnonymous(); // az étlapot bejelentkezés nélkül is lehet böngészni
 
         group.MapPost("/", async (CreateDishRequest req, AddDishHandler handler, CancellationToken ct) =>
         {
             var dish = await handler.HandleAsync(req, ct);
             return Results.Created($"/api/dishes/{dish.Id}", dish);
-        }).AddEndpointFilter<ValidationFilter<CreateDishRequest>>();
+        }).AddEndpointFilter<ValidationFilter<CreateDishRequest>>()
+          .RequireAuthorization(AuthPolicies.StaffOnly);
 
         group.MapPatch("/{id:int}/availability", async (int id, SetDishAvailabilityRequest req, SetDishAvailabilityHandler handler, CancellationToken ct)
-            => Results.Ok(await handler.HandleAsync(id, req, ct)));
+            => Results.Ok(await handler.HandleAsync(id, req, ct)))
+            .RequireAuthorization(AuthPolicies.StaffOnly);
     }
 }

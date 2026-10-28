@@ -1,10 +1,4 @@
-﻿namespace FoodOrder.Shared.Models;
-
-public enum UserRole
-{
-    Customer,
-    Staff
-}
+namespace FoodOrder.Shared.Models;
 
 public enum OrderStatusCode
 {

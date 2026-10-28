@@ -1,106 +1,95 @@
 @page "/etterem/rendelesek"
+@attribute [Authorize(Roles = AppRoles.Staff)]
 @inject IOrderService OrderService
 @inject ICourierService CourierService
-@inject ISessionService SessionService
-@implements IDisposable
 
 <PageTitle>Beérkezett rendelések</PageTitle>
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
     <h2 class="mb-0">Beérkezett rendelések</h2>
-    @if (SessionService.CurrentRole == UserRole.Staff)
+    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@_loading">Frissítés</button>
+</div>
+
+<div class="btn-group flex-wrap mb-3" role="group" aria-label="Szűrés állapot szerint">
+    @foreach (var filter in Enum.GetValues<OrderFilter>())
     {
-        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@_loading">Frissítés</button>
+        <button type="button"
+                class="btn btn-sm @(_filter == filter ? "btn-primary" : "btn-outline-primary")"
+                aria-pressed="@(_filter == filter ? "true" : "false")"
+                @onclick="() => _filter = filter">
+            @FilterLabel(filter) (@Apply(filter).Count())
+        </button>
     }
 </div>
 
-@if (SessionService.CurrentRole != UserRole.Staff)
+<ErrorAlert Message="@_warning" Warning="true" />
+
+@if (_loading && _orders.Count == 0)
 {
-    <div class="alert alert-danger">Ez az oldal csak éttermi dolgozóként érhető el. Válts szerepkört a felső sávban.</div>
+    <LoadingIndicator Text="Rendelések betöltése..." />
+}
+else if (_error is not null)
+{
+    <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
+}
+else if (!Apply(_filter).Any())
+{
+    <p class="text-muted">Ebben a nézetben nincs rendelés.</p>
 }
 else
 {
-    <div class="btn-group flex-wrap mb-3" role="group" aria-label="Szűrés állapot szerint">
-        @foreach (var filter in Enum.GetValues<OrderFilter>())
+    <div class="row row-cols-1 g-4">
+        @foreach (var order in Apply(_filter))
         {
-            <button type="button"
-                    class="btn btn-sm @(_filter == filter ? "btn-primary" : "btn-outline-primary")"
-                    aria-pressed="@(_filter == filter ? "true" : "false")"
-                    @onclick="() => _filter = filter">
-                @FilterLabel(filter) (@Apply(filter).Count())
-            </button>
+            var busy = _busyOrders.Contains(order.Id);
+            <div class="col">
+                <OrderCard Order="order" IsStaffView="true">
+                    @* Csak a szerver által felkínált állapotokra lehet váltani. *@
+                    @foreach (var next in order.AllowedNextStatuses)
+                    {
+                        <button type="button"
+                                class="btn btn-sm @(next.Code == OrderStatusUi.Cancelled ? "btn-outline-danger" : "btn-primary")"
+                                disabled="@busy"
+                                @onclick="() => RequestStatusChangeAsync(order, next)">
+                            @(next.Code == OrderStatusUi.Cancelled ? "Lemondás" : $"→ {next.DisplayName}")
+                        </button>
+                    }
+
+                    @if (order.CanAssignCourier)
+                    {
+                        <div class="input-group input-group-sm w-auto">
+                            <label class="input-group-text" for="courier-@order.Id">Futár</label>
+                            <select id="courier-@order.Id" class="form-select" disabled="@busy"
+                                    value="@SelectedCourier(order)"
+                                    @onchange="e => SelectCourier(order.Id, e)">
+                                <option value="">Válassz...</option>
+                                @foreach (var courier in ActiveCouriers)
+                                {
+                                    <option value="@courier.Id">@courier.Name</option>
+                                }
+                            </select>
+                            <button type="button" class="btn btn-outline-primary"
+                                    disabled="@(busy || !_selectedCourier.ContainsKey(order.Id))"
+                                    @onclick="() => AssignCourierAsync(order)">
+                                Hozzárendelés
+                            </button>
+                        </div>
+                        @if (order.CourierId is null)
+                        {
+                            <small class="text-muted">A kiszállításhoz előbb rendelj hozzá futárt.</small>
+                        }
+                    }
+
+                    @if (busy)
+                    {
+                        <span class="spinner-border spinner-border-sm text-secondary" role="status">
+                            <span class="visually-hidden">Mentés...</span>
+                        </span>
+                    }
+                </OrderCard>
+            </div>
         }
     </div>
-
-    <ErrorAlert Message="@_warning" Warning="true" />
-
-    @if (_loading && _orders.Count == 0)
-    {
-        <LoadingIndicator Text="Rendelések betöltése..." />
-    }
-    else if (_error is not null)
-    {
-        <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
-    }
-    else if (!Apply(_filter).Any())
-    {
-        <p class="text-muted">Ebben a nézetben nincs rendelés.</p>
-    }
-    else
-    {
-        <div class="row row-cols-1 g-4">
-            @foreach (var order in Apply(_filter))
-            {
-                var busy = _busyOrders.Contains(order.Id);
-                <div class="col">
-                    <OrderCard Order="order" IsStaffView="true">
-                        @* Csak a szerver által felkínált állapotokra lehet váltani. *@
-                        @foreach (var next in order.AllowedNextStatuses)
-                        {
-                            <button type="button"
-                                    class="btn btn-sm @(next.Code == OrderStatusUi.Cancelled ? "btn-outline-danger" : "btn-primary")"
-                                    disabled="@busy"
-                                    @onclick="() => RequestStatusChangeAsync(order, next)">
-                                @(next.Code == OrderStatusUi.Cancelled ? "Lemondás" : $"→ {next.DisplayName}")
-                            </button>
-                        }
-
-                        @if (order.CanAssignCourier)
-                        {
-                            <div class="input-group input-group-sm w-auto">
-                                <label class="input-group-text" for="courier-@order.Id">Futár</label>
-                                <select id="courier-@order.Id" class="form-select" disabled="@busy"
-                                        value="@SelectedCourier(order)"
-                                        @onchange="e => SelectCourier(order.Id, e)">
-                                    <option value="">Válassz...</option>
-                                    @foreach (var courier in ActiveCouriers)
-                                    {
-                                        <option value="@courier.Id">@courier.Name</option>
-                                    }
-                                </select>
-                                <button type="button" class="btn btn-outline-primary"
-                                        disabled="@(busy || !_selectedCourier.ContainsKey(order.Id))"
-                                        @onclick="() => AssignCourierAsync(order)">
-                                    Hozzárendelés
-                                </button>
-                            </div>
-                            @if (order.CourierId is null)
-                            {
-                                <small class="text-muted">A kiszállításhoz előbb rendelj hozzá futárt.</small>
-                            }
-                        }
-
-                        @if (busy)
-                        {
-                            <span class="spinner-border spinner-border-sm text-secondary" role="status">
-                                <span class="visually-hidden">Mentés...</span>
-                            </span>
-                        }
-                    </OrderCard>
-                </div>
-            }
-        </div>
-    }
 }
 
 <ConfirmDialog IsOpen="@(_pendingCancel is not null)"
@@ -127,7 +116,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        SessionService.OnChange += StateHasChanged;
         await LoadAsync();
     }
 
@@ -247,10 +235,5 @@ else
         var index = _orders.FindIndex(o => o.Id == updated.Id);
         if (index >= 0)
             _orders[index] = updated;
-    }
-
-    public void Dispose()
-    {
-        SessionService.OnChange -= StateHasChanged;
     }
 }

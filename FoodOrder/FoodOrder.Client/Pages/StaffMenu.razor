@@ -1,119 +1,112 @@
 @page "/etterem/etlap"
+@attribute [Authorize(Roles = AppRoles.Staff)]
 @inject IMenuService MenuService
-@inject ISessionService SessionService
 @implements IDisposable
 
 <PageTitle>Étlap kezelése</PageTitle>
 
 <h2 class="mb-4">Étlap kezelése</h2>
 
-@if (SessionService.CurrentRole != UserRole.Staff)
+<div class="card shadow-sm mb-5">
+    <div class="card-header bg-primary text-white fw-bold">Új étel felvétele</div>
+    <div class="card-body">
+        <ErrorAlert Message="@_formError" Details="@_formErrorDetails" />
+        @if (_savedMessage is not null)
+        {
+            <div class="alert alert-success py-2" role="status">@_savedMessage</div>
+        }
+
+        <EditForm Model="_newDish" OnValidSubmit="AddNewDishAsync">
+            <DataAnnotationsValidator />
+
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label" for="dish-name">Étel neve</label>
+                    <InputText id="dish-name" class="form-control" @bind-Value="_newDish.Name" />
+                    <ValidationMessage For="@(() => _newDish.Name)" class="text-danger small" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="dish-category">Kategória</label>
+                    <InputSelect id="dish-category" class="form-select" @bind-Value="_newDish.Category">
+                        <option value="">Válassz...</option>
+                        @foreach (var (categoryCode, categoryLabel) in DishCategories.All)
+                        {
+                            <option value="@categoryCode">@categoryLabel</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="@(() => _newDish.Category)" class="text-danger small" />
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" for="dish-price">Ár (Ft)</label>
+                    <InputNumber id="dish-price" class="form-control" @bind-Value="_newDish.Price" />
+                    <ValidationMessage For="@(() => _newDish.Price)" class="text-danger small" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-success w-100 fw-bold" disabled="@_saving">
+                        @(_saving ? "Mentés..." : "Mentés")
+                    </button>
+                </div>
+                <div class="col-12">
+                    <label class="form-label" for="dish-description">Leírás</label>
+                    <InputTextArea id="dish-description" class="form-control" @bind-Value="_newDish.Description" rows="2" />
+                    <ValidationMessage For="@(() => _newDish.Description)" class="text-danger small" />
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<h4 class="mb-3">Ételek</h4>
+
+<ErrorAlert Message="@_listWarning" Warning="true" />
+
+@if (_loading)
 {
-    <div class="alert alert-danger">Ez az oldal csak éttermi dolgozóként érhető el. Válts szerepkört a felső sávban.</div>
+    <LoadingIndicator Text="Étlap betöltése..." />
+}
+else if (_error is not null)
+{
+    <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
+}
+else if (MenuService.Dishes.Count == 0)
+{
+    <p class="text-muted">Még nincs étel az étlapon.</p>
 }
 else
 {
-    <div class="card shadow-sm mb-5">
-        <div class="card-header bg-primary text-white fw-bold">Új étel felvétele</div>
-        <div class="card-body">
-            <ErrorAlert Message="@_formError" Details="@_formErrorDetails" />
-            @if (_savedMessage is not null)
-            {
-                <div class="alert alert-success py-2" role="status">@_savedMessage</div>
-            }
-
-            <EditForm Model="_newDish" OnValidSubmit="AddNewDishAsync">
-                <DataAnnotationsValidator />
-
-                <div class="row g-3">
-                    <div class="col-md-4">
-                        <label class="form-label" for="dish-name">Étel neve</label>
-                        <InputText id="dish-name" class="form-control" @bind-Value="_newDish.Name" />
-                        <ValidationMessage For="@(() => _newDish.Name)" class="text-danger small" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label" for="dish-category">Kategória</label>
-                        <InputSelect id="dish-category" class="form-select" @bind-Value="_newDish.Category">
-                            <option value="">Válassz...</option>
-                            @foreach (var (categoryCode, categoryLabel) in DishCategories.All)
-                            {
-                                <option value="@categoryCode">@categoryLabel</option>
-                            }
-                        </InputSelect>
-                        <ValidationMessage For="@(() => _newDish.Category)" class="text-danger small" />
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label" for="dish-price">Ár (Ft)</label>
-                        <InputNumber id="dish-price" class="form-control" @bind-Value="_newDish.Price" />
-                        <ValidationMessage For="@(() => _newDish.Price)" class="text-danger small" />
-                    </div>
-                    <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-success w-100 fw-bold" disabled="@_saving">
-                            @(_saving ? "Mentés..." : "Mentés")
-                        </button>
-                    </div>
-                    <div class="col-12">
-                        <label class="form-label" for="dish-description">Leírás</label>
-                        <InputTextArea id="dish-description" class="form-control" @bind-Value="_newDish.Description" rows="2" />
-                        <ValidationMessage For="@(() => _newDish.Description)" class="text-danger small" />
-                    </div>
-                </div>
-            </EditForm>
-        </div>
-    </div>
-
-    <h4 class="mb-3">Ételek</h4>
-
-    <ErrorAlert Message="@_listWarning" Warning="true" />
-
-    @if (_loading)
-    {
-        <LoadingIndicator Text="Étlap betöltése..." />
-    }
-    else if (_error is not null)
-    {
-        <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
-    }
-    else if (MenuService.Dishes.Count == 0)
-    {
-        <p class="text-muted">Még nincs étel az étlapon.</p>
-    }
-    else
-    {
-        <div class="table-responsive position-relative shadow-sm">
-            <table class="table table-striped align-middle mb-0">
-                <thead class="table-dark">
+    <div class="table-responsive position-relative shadow-sm">
+        <table class="table table-striped align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">Név</th>
+                    <th scope="col">Kategória</th>
+                    <th scope="col">Leírás</th>
+                    <th scope="col">Ár</th>
+                    <th scope="col" class="text-center">Rendelhető</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var dish in MenuService.Dishes)
+                {
+                    var busy = _busyDishes.Contains(dish.Id);
                     <tr>
-                        <th scope="col">Név</th>
-                        <th scope="col">Kategória</th>
-                        <th scope="col">Leírás</th>
-                        <th scope="col">Ár</th>
-                        <th scope="col" class="text-center">Rendelhető</th>
+                        <td class="fw-bold">@dish.Name</td>
+                        <td><span class="badge bg-secondary">@DishCategories.Label(dish.Category)</span></td>
+                        <td class="small text-muted">@dish.Description</td>
+                        <td class="text-nowrap">@HufFormatter.Format(dish.Price)</td>
+                        <td class="text-center">
+                            <button type="button"
+                                    class="btn btn-sm @(dish.IsAvailable ? "btn-outline-success" : "btn-outline-danger")"
+                                    disabled="@busy"
+                                    @onclick="() => ToggleAvailabilityAsync(dish)">
+                                @(dish.IsAvailable ? "Igen – kikapcsolás" : "Nem – bekapcsolás")
+                            </button>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach (var dish in MenuService.Dishes)
-                    {
-                        var busy = _busyDishes.Contains(dish.Id);
-                        <tr>
-                            <td class="fw-bold">@dish.Name</td>
-                            <td><span class="badge bg-secondary">@DishCategories.Label(dish.Category)</span></td>
-                            <td class="small text-muted">@dish.Description</td>
-                            <td class="text-nowrap">@HufFormatter.Format(dish.Price)</td>
-                            <td class="text-center">
-                                <button type="button"
-                                        class="btn btn-sm @(dish.IsAvailable ? "btn-outline-success" : "btn-outline-danger")"
-                                        disabled="@busy"
-                                        @onclick="() => ToggleAvailabilityAsync(dish)">
-                                    @(dish.IsAvailable ? "Igen – kikapcsolás" : "Nem – bekapcsolás")
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
@@ -130,7 +123,6 @@ else
     protected override async Task OnInitializedAsync()
     {
         MenuService.OnChange += StateHasChanged;
-        SessionService.OnChange += StateHasChanged;
         await LoadAsync();
     }
 
@@ -196,6 +188,5 @@ else
     public void Dispose()
     {
         MenuService.OnChange -= StateHasChanged;
-        SessionService.OnChange -= StateHasChanged;
     }
 }

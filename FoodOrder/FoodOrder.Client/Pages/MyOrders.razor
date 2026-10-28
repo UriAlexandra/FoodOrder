@@ -1,23 +1,15 @@
 @page "/rendeleseim"
+@attribute [Authorize(Roles = AppRoles.Customer)]
 @inject IOrderService OrderService
-@inject ISessionService SessionService
-@implements IDisposable
 
 <PageTitle>Rendeléseim</PageTitle>
 
 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
     <h2 class="mb-0">Rendeléseim</h2>
-    @if (SessionService.CurrentRole == UserRole.Customer)
-    {
-        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@_loading">Frissítés</button>
-    }
+    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@_loading">Frissítés</button>
 </div>
 
-@if (SessionService.CurrentRole != UserRole.Customer)
-{
-    <div class="alert alert-warning">A saját rendelések csak vásárlóként láthatók. Válts vásárló szerepkörre a felső sávban.</div>
-}
-else if (_loading && _orders.Count == 0)
+@if (_loading && _orders.Count == 0)
 {
     <LoadingIndicator Text="Rendelések betöltése..." />
 }
@@ -51,7 +43,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        SessionService.OnChange += StateHasChanged;
         await LoadAsync();
     }
 
@@ -61,7 +52,7 @@ else
         _error = null;
         try
         {
-            _orders = await OrderService.GetOrdersAsync(DemoUsers.CustomerEmail);
+            _orders = await OrderService.GetOrdersAsync();
         }
         catch (ApiException ex)
         {
@@ -71,10 +62,5 @@ else
         {
             _loading = false;
         }
-    }
-
-    public void Dispose()
-    {
-        SessionService.OnChange -= StateHasChanged;
     }
 }

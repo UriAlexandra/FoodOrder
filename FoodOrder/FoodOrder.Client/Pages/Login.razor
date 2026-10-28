@@ -1,0 +1,96 @@
+@page "/bejelentkezes"
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Bejelentkezés</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6 col-xl-5">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="mb-4">Bejelentkezés</h2>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="alert alert-info" role="status">
+                            Már be vagy jelentkezve: <strong>@context.User.Identity?.Name</strong>.
+                        </div>
+                        <a class="btn btn-primary" href="@ReturnUrl.Resolve(RequestedUrl, AuthService.CurrentUser?.Roles ?? [])">Tovább</a>
+                    </Authorized>
+                    <NotAuthorized>
+                        @if (!string.IsNullOrEmpty(RequestedUrl) && _error is null)
+                        {
+                            <div class="alert alert-warning py-2" role="status">A folytatáshoz jelentkezz be.</div>
+                        }
+                        <ErrorAlert Message="@_error" />
+
+                        <EditForm Model="_model" OnValidSubmit="LoginAsync" Context="form">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-3">
+                                <label class="form-label" for="login-email">E-mail-cím</label>
+                                <InputText id="login-email" type="email" class="form-control" autocomplete="username"
+                                           @bind-Value="_model.Email" />
+                                <ValidationMessage For="@(() => _model.Email)" class="text-danger small" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="login-password">Jelszó</label>
+                                <InputText id="login-password" type="password" class="form-control" autocomplete="current-password"
+                                           @bind-Value="_model.Password" />
+                                <ValidationMessage For="@(() => _model.Password)" class="text-danger small" />
+                            </div>
+
+                            <div class="form-check mb-4">
+                                <InputCheckbox id="login-remember" class="form-check-input" @bind-Value="_model.RememberMe" />
+                                <label class="form-check-label" for="login-remember">Emlékezz rám ezen az eszközön</label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100" disabled="@_submitting">
+                                @(_submitting ? "Bejelentkezés..." : "Bejelentkezés")
+                            </button>
+                        </EditForm>
+
+                        <p class="mt-4 mb-0 text-center">
+                            Még nincs fiókod? <a href="@RegisterLink">Regisztráció</a>
+                        </p>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? RequestedUrl { get; set; }
+
+    private LoginRequest _model = new();
+    private bool _submitting;
+    private string? _error;
+
+    private string RegisterLink => ReturnUrl.IsLocal(RequestedUrl)
+        ? $"regisztracio?returnUrl={Uri.EscapeDataString(RequestedUrl!)}"
+        : "regisztracio";
+
+    private async Task LoginAsync()
+    {
+        _submitting = true;
+        _error = null;
+        try
+        {
+            var user = await AuthService.LoginAsync(_model);
+            Navigation.NavigateTo(ReturnUrl.Resolve(RequestedUrl, user.Roles));
+        }
+        catch (ApiException ex)
+        {
+            // A jelszót biztonsági okból töröljük, az e-mail-cím marad.
+            _error = ex.Message;
+            _model.Password = string.Empty;
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+}

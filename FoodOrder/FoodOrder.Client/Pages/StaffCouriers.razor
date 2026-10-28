@@ -1,103 +1,95 @@
 @page "/etterem/futarok"
+@attribute [Authorize(Roles = AppRoles.Staff)]
 @inject ICourierService CourierService
-@inject ISessionService SessionService
-@implements IDisposable
 
 <PageTitle>Futárok</PageTitle>
 
 <h2 class="mb-4">Futárok</h2>
 
-@if (SessionService.CurrentRole != UserRole.Staff)
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-primary text-white fw-bold">Új futár felvétele</div>
+    <div class="card-body">
+        <ErrorAlert Message="@_formError" Details="@_formErrorDetails" />
+        @if (_savedMessage is not null)
+        {
+            <div class="alert alert-success py-2" role="status">@_savedMessage</div>
+        }
+
+        <EditForm Model="_newCourier" OnValidSubmit="AddCourierAsync">
+            <DataAnnotationsValidator />
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label" for="courier-name">Név</label>
+                    <InputText id="courier-name" class="form-control" @bind-Value="_newCourier.Name" />
+                    <ValidationMessage For="@(() => _newCourier.Name)" class="text-danger small" />
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label" for="courier-phone">Telefonszám</label>
+                    <InputText id="courier-phone" class="form-control" @bind-Value="_newCourier.Phone"
+                               placeholder="+36 30 123 4567" />
+                    <ValidationMessage For="@(() => _newCourier.Phone)" class="text-danger small" />
+                </div>
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-success w-100 fw-bold" disabled="@_saving">
+                        @(_saving ? "Mentés..." : "Felvétel")
+                    </button>
+                </div>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+<ErrorAlert Message="@_listWarning" Warning="true" />
+
+@if (_loading)
 {
-    <div class="alert alert-danger">Ez az oldal csak éttermi dolgozóként érhető el. Válts szerepkört a felső sávban.</div>
+    <LoadingIndicator Text="Futárok betöltése..." />
+}
+else if (_error is not null)
+{
+    <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_couriers.Count == 0)
+{
+    <p class="text-muted">Még nincs futár felvéve.</p>
 }
 else
 {
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-primary text-white fw-bold">Új futár felvétele</div>
-        <div class="card-body">
-            <ErrorAlert Message="@_formError" Details="@_formErrorDetails" />
-            @if (_savedMessage is not null)
-            {
-                <div class="alert alert-success py-2" role="status">@_savedMessage</div>
-            }
-
-            <EditForm Model="_newCourier" OnValidSubmit="AddCourierAsync">
-                <DataAnnotationsValidator />
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-5">
-                        <label class="form-label" for="courier-name">Név</label>
-                        <InputText id="courier-name" class="form-control" @bind-Value="_newCourier.Name" />
-                        <ValidationMessage For="@(() => _newCourier.Name)" class="text-danger small" />
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label" for="courier-phone">Telefonszám</label>
-                        <InputText id="courier-phone" class="form-control" @bind-Value="_newCourier.Phone"
-                                   placeholder="+36 30 123 4567" />
-                        <ValidationMessage For="@(() => _newCourier.Phone)" class="text-danger small" />
-                    </div>
-                    <div class="col-md-3">
-                        <button type="submit" class="btn btn-success w-100 fw-bold" disabled="@_saving">
-                            @(_saving ? "Mentés..." : "Felvétel")
-                        </button>
-                    </div>
-                </div>
-            </EditForm>
-        </div>
-    </div>
-
-    <ErrorAlert Message="@_listWarning" Warning="true" />
-
-    @if (_loading)
-    {
-        <LoadingIndicator Text="Futárok betöltése..." />
-    }
-    else if (_error is not null)
-    {
-        <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
-    }
-    else if (_couriers.Count == 0)
-    {
-        <p class="text-muted">Még nincs futár felvéve.</p>
-    }
-    else
-    {
-        <div class="table-responsive position-relative shadow-sm">
-            <table class="table table-striped align-middle mb-0">
-                <thead class="table-dark">
+    <div class="table-responsive position-relative shadow-sm">
+        <table class="table table-striped align-middle mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th scope="col">Név</th>
+                    <th scope="col">Telefonszám</th>
+                    <th scope="col">Állapot</th>
+                    <th scope="col" class="text-end"><span class="visually-hidden">Műveletek</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var courier in _couriers)
+                {
+                    var busy = _busyCouriers.Contains(courier.Id);
                     <tr>
-                        <th scope="col">Név</th>
-                        <th scope="col">Telefonszám</th>
-                        <th scope="col">Állapot</th>
-                        <th scope="col" class="text-end"><span class="visually-hidden">Műveletek</span></th>
+                        <td class="fw-semibold">@courier.Name</td>
+                        <td class="text-nowrap">@HuPhoneFormatter.Format(courier.Phone)</td>
+                        <td>
+                            <span class="badge @(courier.IsActive ? "text-bg-success" : "text-bg-secondary")">
+                                @(courier.IsActive ? "Aktív" : "Inaktív")
+                            </span>
+                        </td>
+                        <td class="text-end">
+                            <button type="button"
+                                    class="btn btn-sm @(courier.IsActive ? "btn-outline-secondary" : "btn-outline-success")"
+                                    disabled="@busy"
+                                    @onclick="() => ToggleActiveAsync(courier)">
+                                @(courier.IsActive ? "Inaktiválás" : "Aktiválás")
+                            </button>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    @foreach (var courier in _couriers)
-                    {
-                        var busy = _busyCouriers.Contains(courier.Id);
-                        <tr>
-                            <td class="fw-semibold">@courier.Name</td>
-                            <td class="text-nowrap">@HuPhoneFormatter.Format(courier.Phone)</td>
-                            <td>
-                                <span class="badge @(courier.IsActive ? "text-bg-success" : "text-bg-secondary")">
-                                    @(courier.IsActive ? "Aktív" : "Inaktív")
-                                </span>
-                            </td>
-                            <td class="text-end">
-                                <button type="button"
-                                        class="btn btn-sm @(courier.IsActive ? "btn-outline-secondary" : "btn-outline-success")"
-                                        disabled="@busy"
-                                        @onclick="() => ToggleActiveAsync(courier)">
-                                    @(courier.IsActive ? "Inaktiválás" : "Aktiválás")
-                                </button>
-                            </td>
-                        </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
-    }
+                }
+            </tbody>
+        </table>
+    </div>
 }
 
 @code {
@@ -114,7 +106,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        SessionService.OnChange += StateHasChanged;
         await LoadAsync();
     }
 
@@ -178,10 +169,5 @@ else
         {
             _busyCouriers.Remove(courier.Id);
         }
-    }
-
-    public void Dispose()
-    {
-        SessionService.OnChange -= StateHasChanged;
     }
 }

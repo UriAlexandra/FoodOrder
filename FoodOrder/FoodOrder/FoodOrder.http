@@ -1,122 +1,168 @@
 @HostAddress = https://localhost:7060
 
-### 1. Get Available Menu
+# Használat Visual Studióban: futtasd az alkalmazást (https profil), majd a kérések fölötti „Send request” linkkel küldd őket.
+# A bejelentkezés sütit ad vissza; a későbbi kérések ezt a Cookie fejlécben küldik tovább a névvel ellátott
+# (# @name) bejelentkező kérés válaszából. Ezért egy szakasz kéréseinél ELŐBB a szakasz bejelentkezését küldd el.
+# Tesztfiókok (csak Development): dolgozo@foodorder.hu, anna@foodorder.hu, bela@foodorder.hu – jelszó: Demo123!
+
+### ===== Bejelentkezés nélkül =====
+
+### Étlap – névtelenül is elérhető (200)
 GET {{HostAddress}}/api/dishes?onlyAvailable=true
 
-### 2. Place Order (User)
+### Új étel bejelentkezés nélkül – 401 (nem átirányítás!)
+POST {{HostAddress}}/api/dishes
+Content-Type: application/json
+
+{ "name": "Teszt", "description": "", "category": "Soup", "price": 1000 }
+
+### Rendelések bejelentkezés nélkül – 401
+GET {{HostAddress}}/api/orders
+
+### Ki vagyok? bejelentkezés nélkül – 401
+GET {{HostAddress}}/api/auth/me
+
+### ===== Vásárlóként (Kiss Anna) =====
+
+### Bejelentkezés – 200, Set-Cookie: FoodOrder.Auth=…; secure; samesite=strict; httponly
+# @name annaLogin
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "anna@foodorder.hu", "password": "Demo123!" }
+
+### Ki vagyok? – Kiss Anna, ["Customer"]
+GET {{HostAddress}}/api/auth/me
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
+
+### Új étel vásárlóként – 403
+POST {{HostAddress}}/api/dishes
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "name": "Teszt", "description": "", "category": "Soup", "price": 1000 }
+
+### Rendelés leadása (a név és az e-mail a bejelentkezett felhasználóból jön) – 201
 # @name placeOrder
 POST {{HostAddress}}/api/orders
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
 {
   "deliveryAddress": "1055 Budapest, Kossuth Lajos tér 1-3.",
   "note": "Kapucsengő 42",
-  "customerName": "Kiss Anna",
-  "customerEmail": "anna@example.com",
-  "items": [
-    { "dishId": 1, "quantity": 2 },
-    { "dishId": 3, "quantity": 1 }
-  ]
+  "items": [ { "dishId": 1, "quantity": 2 }, { "dishId": 3, "quantity": 1 } ]
 }
 
-### (Extract OrderId from the response to a variable)
+###
 @OrderId = {{placeOrder.response.body.orderId}}
 
-### 3. Track Order (Verify Version = 1, Status = Placed)
+### Saját rendelés – az AllowedNextStatuses csak a Cancelled-et tartalmazza
 GET {{HostAddress}}/api/orders/{{OrderId}}
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
 
-### 4. Staff Accepts Order (Version 1 -> 2)
+### Saját rendelések (csak Annáé)
+GET {{HostAddress}}/api/orders
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
+
+### Állapotváltás vásárlóként (nem lemondás) – 403
 POST {{HostAddress}}/api/orders/{{OrderId}}/status
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
-{
-  "newStatus": "Accepted",
-  "expectedVersion": 1
-}
+{ "newStatus": "Accepted", "expectedVersion": 1 }
 
-### 5. Staff Assigns Courier (CourierId: 1, Version 2 -> 3)
-POST {{HostAddress}}/api/orders/{{OrderId}}/courier
-Content-Type: application/json
-
-{
-  "courierId": 1,
-  "expectedVersion": 2
-}
-
-### 6. Order Preparing (Version 3 -> 4)
-POST {{HostAddress}}/api/orders/{{OrderId}}/status
-Content-Type: application/json
-
-{
-  "newStatus": "Preparing",
-  "expectedVersion": 3
-}
-
-### 7. Ready for Pickup (Version 4 -> 5)
-POST {{HostAddress}}/api/orders/{{OrderId}}/status
-Content-Type: application/json
-
-{
-  "newStatus": "ReadyForPickup",
-  "expectedVersion": 4
-}
-
-### 8. Out for Delivery (Version 5 -> 6)
-POST {{HostAddress}}/api/orders/{{OrderId}}/status
-Content-Type: application/json
-
-{
-  "newStatus": "OutForDelivery",
-  "expectedVersion": 5
-}
-
-### 9. Delivered (Version 6 -> 7)
-POST {{HostAddress}}/api/orders/{{OrderId}}/status
-Content-Type: application/json
-
-{
-  "newStatus": "Delivered",
-  "expectedVersion": 6
-}
-
-### 10. ERROR TEST: Try to transition Delivered -> Preparing (EXPECT 409)
-POST {{HostAddress}}/api/orders/{{OrderId}}/status
-Content-Type: application/json
-
-{
-  "newStatus": "Preparing",
-  "expectedVersion": 7
-}
-
-### 11. ERROR TEST: Concurrency Conflict (EXPECT 409)
-# Send Cancelled with outdated ExpectedVersion (1 instead of 7)
-POST {{HostAddress}}/api/orders/{{OrderId}}/status
-Content-Type: application/json
-
-{
-  "newStatus": "Cancelled",
-  "expectedVersion": 1
-}
-
-### 12. Egy vásárló rendelései (4. hét: a "Rendeléseim" oldal ezt hívja)
-GET {{HostAddress}}/api/orders?customerEmail=anna@example.com
-
-### 13. Futárok listája
+### Futárlista vásárlóként – 403
 GET {{HostAddress}}/api/couriers
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
 
-### 14. Új futár (hibás telefonszámmal 400-at ad)
-POST {{HostAddress}}/api/couriers
+### ===== Másik vásárlóként (Kovács Béla) =====
+
+### Bejelentkezés
+# @name belaLogin
+POST {{HostAddress}}/api/auth/login
 Content-Type: application/json
 
-{
-  "name": "Szabó Dénes",
-  "phone": "+36 70 555 1234"
-}
+{ "email": "bela@foodorder.hu", "password": "Demo123!" }
 
-### 15. Futár inaktiválása (inaktív futár nem rendelhető ki)
-PATCH {{HostAddress}}/api/couriers/2/active
+### Anna rendelése Bélának – 404 (nem derül ki, hogy létezik)
+GET {{HostAddress}}/api/orders/{{OrderId}}
+Cookie: {{belaLogin.response.headers.Set-Cookie}}
+
+### Anna rendelésének lemondása Bélaként – 404
+POST {{HostAddress}}/api/orders/{{OrderId}}/status
+Cookie: {{belaLogin.response.headers.Set-Cookie}}
 Content-Type: application/json
 
-{
-  "isActive": false
-}
+{ "newStatus": "Cancelled", "expectedVersion": 1 }
+
+### ===== Éttermi dolgozóként (Nagy Péter) =====
+
+### Bejelentkezés
+# @name staffLogin
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "dolgozo@foodorder.hu", "password": "Demo123!" }
+
+### Minden rendelés – Anna és Béla rendelései is
+GET {{HostAddress}}/api/orders
+Cookie: {{staffLogin.response.headers.Set-Cookie}}
+
+### Anna rendelésének elfogadása – 200 (a dolgozó minden megengedett lépést végrehajthat)
+POST {{HostAddress}}/api/orders/{{OrderId}}/status
+Cookie: {{staffLogin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "newStatus": "Accepted", "expectedVersion": 1 }
+
+### Új étel – 201
+POST {{HostAddress}}/api/dishes
+Cookie: {{staffLogin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "name": "Túrós csusza", "description": "Pirított szalonnával", "category": "MainCourse", "price": 2890 }
+
+### Futárok – 200
+GET {{HostAddress}}/api/couriers
+Cookie: {{staffLogin.response.headers.Set-Cookie}}
+
+### Rendelés leadása dolgozóként – 403 (csak vásárló rendelhet)
+POST {{HostAddress}}/api/orders
+Cookie: {{staffLogin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "deliveryAddress": "1011 Budapest, Fő utca 1.", "items": [ { "dishId": 1, "quantity": 1 } ] }
+
+### ===== Vissza Annához: elfogadott rendelés lemondása =====
+
+### Lemondás Elfogadva állapotban – 403 („Vásárlóként csak a még le nem adott (Leadva állapotú) rendelést…”)
+POST {{HostAddress}}/api/orders/{{OrderId}}/status
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
+Content-Type: application/json
+
+{ "newStatus": "Cancelled", "expectedVersion": 2 }
+
+### Kijelentkezés – 204 (a süti törlődik)
+POST {{HostAddress}}/api/auth/logout
+Cookie: {{annaLogin.response.headers.Set-Cookie}}
+
+### ===== Hibás bejelentkezés és regisztráció =====
+
+### Hibás jelszó – 401 „Hibás e-mail-cím vagy jelszó.” (5 egymás utáni hiba után a fiók 5 percre zárolódik)
+POST {{HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{ "email": "bela@foodorder.hu", "password": "rossz" }
+
+### Gyenge jelszó és foglalt e-mail-cím – 400, mezőnkénti magyar hibák (Email, Password)
+POST {{HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{ "fullName": "Teszt Elek", "email": "anna@foodorder.hu", "password": "gyengejelszo", "confirmPassword": "gyengejelszo" }
+
+### Sikeres regisztráció – 200, Customer szerepkör, egyben be is jelentkeztet
+POST {{HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{ "fullName": "Teszt Elek", "email": "teszt.elek@example.com", "password": "Jelszo123", "confirmPassword": "Jelszo123" }

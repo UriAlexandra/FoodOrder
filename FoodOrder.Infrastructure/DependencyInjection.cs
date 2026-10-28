@@ -1,6 +1,8 @@
 using FoodOrder.Application.Ports;
+using FoodOrder.Infrastructure.Identity;
 using FoodOrder.Infrastructure.Persistence;
 using FoodOrder.Infrastructure.Persistence.Repositories;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +23,13 @@ public static class DependencyInjection
                 sql.EnableRetryOnFailure();
                 sql.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
             }));
+
+        // ASP.NET Core Identity: felhasználók és szerepkörök ugyanabban az adatbázisban, sütis bejelentkezéssel.
+        services.AddIdentity<AppUser, IdentityRole>(IdentitySetup.ConfigureOptions)
+            .AddEntityFrameworkStores<AppDbContext>()
+            .AddDefaultTokenProviders()
+            .AddErrorDescriber<HungarianIdentityErrorDescriber>()
+            .AddClaimsPrincipalFactory<AppUserClaimsPrincipalFactory>();
 
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IDishRepository, DishRepository>();

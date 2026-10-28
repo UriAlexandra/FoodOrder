@@ -8,7 +8,9 @@ public static class CouriersEndpoints
 {
     public static void MapCouriersEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/couriers").WithTags("Couriers");
+        // Futárokat csak éttermi dolgozó kezelhet.
+        var group = app.MapGroup("/api/couriers").WithTags("Couriers")
+            .RequireAuthorization(AuthPolicies.StaffOnly);
 
         group.MapGet("/", async (ListCouriersHandler handler, CancellationToken ct)
             => Results.Ok(await handler.HandleAsync(ct)));

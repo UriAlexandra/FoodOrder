@@ -1,0 +1,131 @@
+@page "/regisztracio"
+@inject IAuthService AuthService
+@inject NavigationManager Navigation
+
+<PageTitle>Regisztráció</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6 col-xl-5">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h2 class="mb-2">Regisztráció</h2>
+                <p class="text-muted mb-4">Vásárlói fiók létrehozása. Éttermi dolgozói fiókot csak az étterem adhat.</p>
+
+                <AuthorizeView>
+                    <Authorized>
+                        <div class="alert alert-info" role="status">
+                            Már be vagy jelentkezve: <strong>@context.User.Identity?.Name</strong>.
+                            Új fiókhoz előbb jelentkezz ki.
+                        </div>
+                    </Authorized>
+                    <NotAuthorized>
+                        <ErrorAlert Message="@_error" Details="@_generalErrors" />
+
+                        <EditForm EditContext="_editContext" OnValidSubmit="RegisterAsync" Context="form">
+                            <DataAnnotationsValidator />
+
+                            <div class="mb-3">
+                                <label class="form-label" for="reg-name">Teljes név</label>
+                                <InputText id="reg-name" class="form-control" autocomplete="name" @bind-Value="_model.FullName" />
+                                <ValidationMessage For="@(() => _model.FullName)" class="text-danger small" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="reg-email">E-mail-cím</label>
+                                <InputText id="reg-email" type="email" class="form-control" autocomplete="email" @bind-Value="_model.Email" />
+                                <ValidationMessage For="@(() => _model.Email)" class="text-danger small" />
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="reg-password">Jelszó</label>
+                                <InputText id="reg-password" type="password" class="form-control" autocomplete="new-password"
+                                           aria-describedby="reg-password-help" @bind-Value="_model.Password" />
+                                <div id="reg-password-help" class="form-text">
+                                    Legalább 8 karakter, kis- és nagybetűvel, valamint számmal.
+                                </div>
+                                <ValidationMessage For="@(() => _model.Password)" class="text-danger small" />
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label" for="reg-confirm">Jelszó még egyszer</label>
+                                <InputText id="reg-confirm" type="password" class="form-control" autocomplete="new-password"
+                                           @bind-Value="_model.ConfirmPassword" />
+                                <ValidationMessage For="@(() => _model.ConfirmPassword)" class="text-danger small" />
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100" disabled="@_submitting">
+                                @(_submitting ? "Regisztráció..." : "Regisztráció")
+                            </button>
+                        </EditForm>
+
+                        <p class="mt-4 mb-0 text-center">
+                            Van már fiókod? <a href="@LoginLink">Bejelentkezés</a>
+                        </p>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? RequestedUrl { get; set; }
+
+    private readonly RegisterRequest _model = new();
+    private EditContext _editContext = default!;
+    private ValidationMessageStore _serverErrors = default!;
+    private bool _submitting;
+    private string? _error;
+    private IReadOnlyList<string> _generalErrors = [];
+
+    private string LoginLink => ReturnUrl.IsLocal(RequestedUrl)
+        ? $"bejelentkezes?returnUrl={Uri.EscapeDataString(RequestedUrl!)}"
+        : "bejelentkezes";
+
+    protected override void OnInitialized()
+    {
+        _editContext = new EditContext(_model);
+        _serverErrors = new ValidationMessageStore(_editContext);
+        // Ha a felhasználó javítja a mezőt, a szerver korábbi hibája eltűnik róla.
+        _editContext.OnFieldChanged += (_, e) => _serverErrors.Clear(e.FieldIdentifier);
+    }
+
+    private async Task RegisterAsync()
+    {
+        _submitting = true;
+        _error = null;
+        _generalErrors = [];
+        _serverErrors.Clear();
+        try
+        {
+            var user = await AuthService.RegisterAsync(_model);
+            Navigation.NavigateTo(ReturnUrl.Resolve(RequestedUrl, user.Roles));
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+            ShowServerErrors(ex.Errors);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    // A szerver mezőnkénti hibái (pl. foglalt e-mail-cím, gyenge jelszó) a megfelelő mező alá kerülnek.
+    private void ShowServerErrors(IReadOnlyDictionary<string, string[]> errors)
+    {
+        var general = new List<string>();
+        foreach (var (key, messages) in errors)
+        {
+            var property = typeof(RegisterRequest).GetProperty(key);
+            if (property is null)
+                general.AddRange(messages);
+            else
+                _serverErrors.Add(new FieldIdentifier(_model, property.Name), messages);
+        }
+        _generalErrors = general;
+        _editContext.NotifyValidationStateChanged();
+    }
+}

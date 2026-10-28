@@ -27,5 +27,9 @@ public class OrderRepository(AppDbContext db) : IOrderRepository
     public Task<List<Order>> GetAllAsync(CancellationToken ct)
         => db.Orders.Include(o => o.Items).Include(o => o.StatusHistory).ToListAsync(ct);
 
+    public Task<List<Order>> GetByCustomerAsync(string customerId, CancellationToken ct)
+        => db.Orders.Where(o => o.CustomerId == customerId)
+            .Include(o => o.Items).Include(o => o.StatusHistory).ToListAsync(ct);
+
     public async Task AddAsync(Order order, CancellationToken ct) => await db.Orders.AddAsync(order, ct);
 }
