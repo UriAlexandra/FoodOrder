@@ -1,20 +1,26 @@
-﻿@page "/kosar"
+@page "/kosar"
 @using System.ComponentModel.DataAnnotations
 @inject ICartService CartService
+@inject IMenuService MenuService
 @inject IOrderService OrderService
+@inject ISessionService SessionService
 @implements IDisposable
 
 <PageTitle>Kosár</PageTitle>
 
-<h2 class="mb-4">Kosár tartalma</h2>
+<h2 class="mb-4">Kosár</h2>
 
-@if (SuccessOrderId != null)
+@if (SessionService.CurrentRole != UserRole.Customer)
 {
-    <div class="alert alert-success p-4 shadow-sm text-center">
+    <div class="alert alert-warning">A kosár csak vásárlóként érhető el. Válts vásárló szerepkörre a felső sávban.</div>
+}
+else if (_placedOrderId is not null)
+{
+    <div class="alert alert-success p-4 shadow-sm text-center" role="status">
         <h4 class="alert-heading">Köszönjük a rendelést!</h4>
-        <p class="mb-0">Sikeresen rögzítettük. Rendelési azonosító: <strong>@SuccessOrderId</strong></p>
+        <p class="mb-0">A rendelés azonosítója: <strong>#@_placedOrderId</strong></p>
         <hr />
-        <a href="rendeleseim" class="btn btn-success mt-2">Rendeléseim megtekintése</a>
+        <a href="@($"rendeleseim/{_placedOrderId}")" class="btn btn-success">Rendelés követése</a>
     </div>
 }
 else if (!CartService.Items.Any())
@@ -24,23 +30,34 @@ else if (!CartService.Items.Any())
 }
 else
 {
-    <div class="row">
+    <ErrorAlert Message="@_error" Details="@_errorDetails" />
+
+    @if (HasUnavailableItems)
+    {
+        <div class="alert alert-warning" role="alert">
+            A megjelölt tételek jelenleg nem rendelhetők. Töröld őket a kosárból a rendelés leadása előtt.
+        </div>
+    }
+
+    <div class="row g-4">
         <div class="col-lg-8">
-            <div class="table-responsive shadow-sm bg-white rounded p-3 mb-4">
+            <div class="table-responsive position-relative shadow-sm bg-white rounded p-3">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="table-light">
                         <tr>
-                            <th>Étel</th>
-                            <th style="width: 130px;">Mennyiség</th>
-                            <th class="text-end">Egységár</th>
-                            <th class="text-end">Összesen</th>
-                            <th></th>
+                            <th scope="col">Étel</th>
+                            <th scope="col" style="width: 110px;">Mennyiség</th>
+                            <th scope="col" class="text-end">Egységár</th>
+                            <th scope="col" class="text-end">Összesen</th>
+                            <th scope="col"><span class="visually-hidden">Műveletek</span></th>
                         </tr>
                     </thead>
                     <tbody>
                         @foreach (var item in CartService.Items)
                         {
                             <CartLine Item="item"
+                                      UnitPrice="@PriceOf(item)"
+                                      IsUnavailable="@IsUnavailable(item)"
                                       OnUpdateQuantity="HandleUpdateQuantity"
                                       OnRemove="HandleRemoveItem" />
                         }
@@ -48,9 +65,7 @@ else
                     <tfoot class="border-top">
                         <tr>
                             <td colspan="3" class="text-end fw-bold fs-5">Végösszeg:</td>
-                            <td class="text-end fw-bold fs-5 text-success">
-                                @HufFormatter.Format(CartService.Items.Sum(c => c.Dish.Price * c.Quantity))
-                            </td>
+                            <td class="text-end fw-bold fs-5 text-success text-nowrap">@HufFormatter.Format(Total)</td>
                             <td></td>
                         </tr>
                     </tfoot>
@@ -62,22 +77,26 @@ else
             <div class="card shadow-sm">
                 <div class="card-header bg-light fw-bold">Szállítási adatok</div>
                 <div class="card-body">
-                    <EditForm Model="CheckoutData" OnValidSubmit="PlaceOrder">
+                    <EditForm Model="_checkout" OnValidSubmit="PlaceOrderAsync">
                         <DataAnnotationsValidator />
 
                         <div class="mb-3">
-                            <label class="form-label">Szállítási cím</label>
-                            <InputText class="form-control" @bind-Value="CheckoutData.Address" placeholder="Pl. 1011 Bp, Fő utca 1." />
-                            <ValidationMessage For="@(() => CheckoutData.Address)" class="text-danger small" />
+                            <label class="form-label" for="address">Szállítási cím</label>
+                            <InputText id="address" class="form-control" @bind-Value="_checkout.Address"
+                                       placeholder="Pl. 1011 Budapest, Fő utca 1." />
+                            <ValidationMessage For="@(() => _checkout.Address)" class="text-danger small" />
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Megjegyzés (opcionális)</label>
-                            <InputTextArea class="form-control" @bind-Value="CheckoutData.Notes" rows="2" placeholder="Kapucsengő, emelet..." />
+                            <label class="form-label" for="note">Megjegyzés (nem kötelező)</label>
+                            <InputTextArea id="note" class="form-control" @bind-Value="_checkout.Note" rows="2"
+                                           placeholder="Kapucsengő, emelet..." />
+                            <ValidationMessage For="@(() => _checkout.Note)" class="text-danger small" />
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
-                            Rendelés leadása
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2"
+                                disabled="@(_submitting || HasUnavailableItems)">
+                            @(_submitting ? "Küldés..." : "Rendelés leadása")
                         </button>
                     </EditForm>
                 </div>
@@ -87,42 +106,88 @@ else
 }
 
 @code {
-    private CheckoutModel CheckoutData = new();
-    private string? SuccessOrderId;
+    private CheckoutModel _checkout = new();
+    private int? _placedOrderId;
+    private bool _submitting;
+    private string? _error;
+    private IReadOnlyList<string> _errorDetails = [];
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
         CartService.OnChange += StateHasChanged;
+        SessionService.OnChange += StateHasChanged;
+
+        // A kosárban tárolt ár és elérhetőség elavulhatott: frissítjük a szerver szerinti étlappal.
+        await RefreshMenuAsync();
     }
 
-    private async Task HandleUpdateQuantity((int dishId, int newQuantity) payload)
+    private async Task RefreshMenuAsync()
     {
-        await CartService.UpdateCartItemAsync(payload.dishId, payload.newQuantity);
+        try
+        {
+            await MenuService.LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
     }
 
-    private async Task HandleRemoveItem(int dishId)
-    {
-        await CartService.RemoveFromCartAsync(dishId);
-    }
+    private DishDto? CurrentDish(CartItemDto item) =>
+        MenuService.Dishes.FirstOrDefault(d => d.Id == item.Dish.Id);
 
-    private async Task PlaceOrder()
+    // Ha az étlap betöltődött, és az étel nincs rajta vagy nem rendelhető, a tételt megjelöljük.
+    private bool IsUnavailable(CartItemDto item) =>
+        MenuService.Dishes.Count > 0 && CurrentDish(item) is not { IsAvailable: true };
+
+    private decimal PriceOf(CartItemDto item) => CurrentDish(item)?.Price ?? item.Dish.Price;
+
+    private bool HasUnavailableItems => CartService.Items.Any(IsUnavailable);
+
+    private decimal Total => CartService.Items.Sum(i => PriceOf(i) * i.Quantity);
+
+    private Task HandleUpdateQuantity((int dishId, int newQuantity) payload) =>
+        CartService.UpdateCartItemAsync(payload.dishId, payload.newQuantity);
+
+    private Task HandleRemoveItem(int dishId) => CartService.RemoveFromCartAsync(dishId);
+
+    private async Task PlaceOrderAsync()
     {
-        SuccessOrderId = await OrderService.PlaceOrderAsync(CartService.Items, CheckoutData.Address, CheckoutData.Notes);
-        await CartService.ClearCartAsync();
-        CheckoutData = new CheckoutModel();
+        _submitting = true;
+        _error = null;
+        _errorDetails = [];
+        try
+        {
+            _placedOrderId = await OrderService.PlaceOrderAsync(CartService.Items, _checkout.Address, _checkout.Note);
+            await CartService.ClearCartAsync();
+            _checkout = new CheckoutModel();
+        }
+        catch (ApiException ex)
+        {
+            // A kosár megmarad; ha közben egy étel elérhetetlenné vált, az étlap frissítése megjelöli.
+            _error = ex.Message;
+            _errorDetails = ex.FieldMessages;
+            await RefreshMenuAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
     }
 
     public void Dispose()
     {
         CartService.OnChange -= StateHasChanged;
+        SessionService.OnChange -= StateHasChanged;
     }
 
     public class CheckoutModel
     {
-        [Required(ErrorMessage = "A szállítási cím megadása kötelező!")]
-        [MinLength(5, ErrorMessage = "A cím túl rövid!")]
+        [Required(ErrorMessage = "A szállítási cím megadása kötelező.")]
+        [StringLength(200, MinimumLength = 5, ErrorMessage = "A cím legalább 5, legfeljebb 200 karakter lehet.")]
         public string Address { get; set; } = string.Empty;
 
-        public string? Notes { get; set; }
+        [MaxLength(300, ErrorMessage = "A megjegyzés legfeljebb 300 karakter lehet.")]
+        public string? Note { get; set; }
     }
 }

@@ -1,0 +1,7 @@
+@* A szín csak kiegészítés: az állapot neve mindig szövegként is látszik. *@
+<span class="badge @OrderStatusUi.BadgeClass(Status)">@Text</span>
+
+@code {
+    [Parameter, EditorRequired] public string Status { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Text { get; set; } = string.Empty;
+}

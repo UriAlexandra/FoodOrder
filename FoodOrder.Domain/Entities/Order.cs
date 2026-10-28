@@ -24,6 +24,20 @@ public class Order
 
     public Money Total => _items.Aggregate(Money.Zero, (sum, item) => sum.Add(item.LineTotal));
 
+    /// <summary>Futárt csak Elfogadva, Készül vagy Kiszállításra kész állapotban lehet hozzárendelni.</summary>
+    public bool CanAssignCourier =>
+        Status == OrderStatus.Accepted || Status == OrderStatus.Preparing || Status == OrderStatus.ReadyForPickup;
+
+    /// <summary>
+    /// A jelenlegi állapotból választható következő állapotok. Az átmenettáblát az OrderStatus adja,
+    /// a „Kiszállítás alatt” pedig csak hozzárendelt futárral választható.
+    /// </summary>
+    public IReadOnlyList<OrderStatus> GetAllowedNextStatuses() =>
+        Status.AllowedNext
+            .Select(OrderStatus.FromCode)
+            .Where(next => next != OrderStatus.OutForDelivery || CourierId.HasValue)
+            .ToList();
+
     // EF Core ezzel a konstruktorral hozza létre az objektumot adatbázisból betöltéskor.
 #pragma warning disable CS8618
     private Order() { }
@@ -61,7 +75,7 @@ public class Order
         foreach (var (dish, quantity) in lines)
         {
             if (!dish.IsAvailable)
-                throw new DomainException($"Az étel jelenleg nem elérhető: {dish.Name}");
+                throw new DomainException($"A(z) {dish.Name} jelenleg nem rendelhető.");
 
             var existingItem = itemsByDish.GetValueOrDefault(dish)
                 ?? (dish.Id != 0 ? order._items.FirstOrDefault(i => i.DishId == dish.Id) : null);
@@ -103,7 +117,7 @@ public class Order
         if (!courier.IsActive)
             throw new DomainException("Inaktív futár nem rendelhető ki.");
 
-        if (Status != OrderStatus.Accepted && Status != OrderStatus.Preparing && Status != OrderStatus.ReadyForPickup)
+        if (!CanAssignCourier)
             throw new DomainException("Futárt csak Elfogadva, Készül vagy Kiszállításra kész állapotban lehet hozzárendelni.");
 
         CourierId = courier.Id;

@@ -1,4 +1,4 @@
-﻿using FoodOrder.Client.Storage;
+using FoodOrder.Client.Storage;
 using FoodOrder.Shared.Models;
 
 namespace FoodOrder.Client.Services;
@@ -26,16 +26,19 @@ public class LocalStorageCartService : ICartService
         NotifyStateChanged();
     }
 
+    // Egy ételből legfeljebb 20 darab rendelhető (a szerver is ellenőrzi).
+    public const int MaxQuantity = 20;
+
     public async Task AddToCartAsync(DishDto dish, int quantity)
     {
         var existing = _items.FirstOrDefault(c => c.Dish.Id == dish.Id);
         if (existing != null)
         {
-            existing.Quantity += quantity;
+            existing.Quantity = Math.Clamp(existing.Quantity + quantity, 1, MaxQuantity);
         }
         else
         {
-            _items.Add(new CartItemDto { Dish = dish, Quantity = quantity });
+            _items.Add(new CartItemDto { Dish = dish, Quantity = Math.Clamp(quantity, 1, MaxQuantity) });
         }
         await SaveAsync();
     }
@@ -48,7 +51,7 @@ public class LocalStorageCartService : ICartService
             if (newQuantity <= 0)
                 _items.Remove(item);
             else
-                item.Quantity = newQuantity;
+                item.Quantity = Math.Min(newQuantity, MaxQuantity);
             await SaveAsync();
         }
     }

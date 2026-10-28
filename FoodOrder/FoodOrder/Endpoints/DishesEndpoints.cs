@@ -1,5 +1,5 @@
-using FoodOrder.Application.Handlers;
 using FoodOrder.Api;
+using FoodOrder.Application.Handlers;
 using FoodOrder.Shared.Requests;
 using Microsoft.AspNetCore.Mvc;
 
@@ -16,14 +16,11 @@ public static class DishesEndpoints
 
         group.MapPost("/", async (CreateDishRequest req, AddDishHandler handler, CancellationToken ct) =>
         {
-            await handler.HandleAsync(req, ct);
-            return Results.Ok();
+            var dish = await handler.HandleAsync(req, ct);
+            return Results.Created($"/api/dishes/{dish.Id}", dish);
         }).AddEndpointFilter<ValidationFilter<CreateDishRequest>>();
 
-        group.MapPatch("/{id:int}/availability", async (int id, SetDishAvailabilityRequest req, SetDishAvailabilityHandler handler, CancellationToken ct) =>
-        {
-            await handler.HandleAsync(id, req, ct);
-            return Results.Ok();
-        });
+        group.MapPatch("/{id:int}/availability", async (int id, SetDishAvailabilityRequest req, SetDishAvailabilityHandler handler, CancellationToken ct)
+            => Results.Ok(await handler.HandleAsync(id, req, ct)));
     }
 }

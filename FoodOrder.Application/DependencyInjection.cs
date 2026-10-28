@@ -1,4 +1,4 @@
-﻿using FoodOrder.Application.Handlers;
+using FoodOrder.Application.Handlers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FoodOrder.Application;
@@ -12,6 +12,7 @@ public static class DependencyInjection
         services.AddScoped<SetDishAvailabilityHandler>();
         services.AddScoped<ListCouriersHandler>();
         services.AddScoped<AddCourierHandler>();
+        services.AddScoped<SetCourierActiveHandler>();
         services.AddScoped<PlaceOrderHandler>();
         services.AddScoped<ChangeOrderStatusHandler>();
         services.AddScoped<AssignCourierHandler>();

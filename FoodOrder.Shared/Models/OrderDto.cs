@@ -1,4 +1,4 @@
-﻿namespace FoodOrder.Shared.Models;
+namespace FoodOrder.Shared.Models;
 
 public class OrderDto
 {
@@ -14,6 +14,12 @@ public class OrderDto
     public string? CourierPhone { get; set; }
     public decimal Total { get; set; }
     public int Version { get; set; }
+
+    /// <summary>Végállapot (Kézbesítve vagy Lemondva) – a szerver dönti el.</summary>
+    public bool IsFinal { get; set; }
+
+    /// <summary>Lehet-e most futárt hozzárendelni – a szerver dönti el.</summary>
+    public bool CanAssignCourier { get; set; }
 
     public List<OrderItemDto> Items { get; set; } = new();
     public List<StatusOptionDto> AllowedNextStatuses { get; set; } = new();

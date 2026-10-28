@@ -1,0 +1,8 @@
+<div class="d-flex align-items-center gap-2 text-muted py-4" role="status">
+    <div class="spinner-border spinner-border-sm" aria-hidden="true"></div>
+    <span>@Text</span>
+</div>
+
+@code {
+    [Parameter] public string Text { get; set; } = "Betöltés...";
+}

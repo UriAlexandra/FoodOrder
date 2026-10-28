@@ -1,35 +1,42 @@
-<tr class="align-middle">
+<tr class="align-middle @(IsUnavailable ? "table-warning" : "")">
     <td>
         <strong>@Item.Dish.Name</strong><br />
         <small class="text-muted">@DishCategories.Label(Item.Dish.Category)</small>
+        @if (IsUnavailable)
+        {
+            <br /><small class="text-danger fw-semibold">Jelenleg nem rendelhető</small>
+        }
     </td>
     <td>
-        <input type="number" class="form-control form-control-sm" min="1"
-               value="@Item.Quantity"
-               @onchange="QuantityChanged" />
+        <label class="visually-hidden" for="qty-@Item.Dish.Id">Mennyiség: @Item.Dish.Name</label>
+        <input id="qty-@Item.Dish.Id" type="number" class="form-control form-control-sm" min="1" max="20"
+               value="@Item.Quantity" @onchange="QuantityChanged" />
     </td>
-    <td class="text-end">@HufFormatter.Format(Item.Dish.Price)</td>
-    <td class="text-end fw-bold">@HufFormatter.Format(Item.Dish.Price * Item.Quantity)</td>
+    <td class="text-end text-nowrap">@HufFormatter.Format(UnitPrice)</td>
+    <td class="text-end fw-bold text-nowrap">@HufFormatter.Format(UnitPrice * Item.Quantity)</td>
     <td class="text-end">
-        <button class="btn btn-sm btn-outline-danger" @onclick="RemoveClicked">X</button>
+        <button type="button" class="btn btn-sm btn-outline-danger" @onclick="RemoveClicked"
+                aria-label="@($"{Item.Dish.Name} törlése a kosárból")">Törlés</button>
     </td>
 </tr>
 
 @code {
     [Parameter, EditorRequired] public CartItemDto Item { get; set; } = default!;
+
+    /// <summary>A szerver szerinti aktuális egységár (ha ismert), különben a kosárba tételkori ár.</summary>
+    [Parameter] public decimal UnitPrice { get; set; }
+
+    [Parameter] public bool IsUnavailable { get; set; }
     [Parameter] public EventCallback<(int dishId, int newQuantity)> OnUpdateQuantity { get; set; }
     [Parameter] public EventCallback<int> OnRemove { get; set; }
 
     private async Task QuantityChanged(ChangeEventArgs e)
     {
-        if (int.TryParse(e.Value?.ToString(), out int q))
+        if (int.TryParse(e.Value?.ToString(), out var quantity))
         {
-            await OnUpdateQuantity.InvokeAsync((Item.Dish.Id, q));
+            await OnUpdateQuantity.InvokeAsync((Item.Dish.Id, quantity));
         }
     }
 
-    private async Task RemoveClicked()
-    {
-        await OnRemove.InvokeAsync(Item.Dish.Id);
-    }
+    private Task RemoveClicked() => OnRemove.InvokeAsync(Item.Dish.Id);
 }

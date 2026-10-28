@@ -1,9 +1,10 @@
-﻿@inject ISessionService SessionService
+@inject ISessionService SessionService
 @implements IDisposable
 
-<div class="d-flex align-items-center">
-    <label class="me-2 fw-semibold text-muted">Szerepkör:</label>
-    <select class="form-select form-select-sm w-auto" value="@SessionService.CurrentRole.ToString()" @onchange="OnRoleChanged">
+<div class="d-flex align-items-center gap-2">
+    <label class="fw-semibold text-muted mb-0 d-none d-md-inline" for="role-switcher">Szerepkör:</label>
+    <select id="role-switcher" class="form-select form-select-sm w-auto" aria-label="Szerepkör"
+            value="@SessionService.CurrentRole.ToString()" @onchange="OnRoleChanged">
         <option value="Customer">Kiss Anna – Vásárló</option>
         <option value="Staff">Nagy Péter – Éttermi dolgozó</option>
     </select>

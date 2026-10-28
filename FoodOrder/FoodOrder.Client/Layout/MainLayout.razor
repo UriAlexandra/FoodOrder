@@ -1,8 +1,7 @@
-﻿@inherits LayoutComponentBase
+@inherits LayoutComponentBase
 @inject ISessionService SessionService
-@inject IMenuService MenuService
 @inject ICartService CartService
-@inject IOrderService OrderService
+@inject IKeyValueStorage Storage
 
 <div class="page">
     <div class="sidebar">
@@ -10,8 +9,8 @@
     </div>
 
     <main>
-        <div class="top-row px-4 d-flex justify-content-between align-items-center bg-light border-bottom">
-            <h5 class="mb-0 text-primary fw-bold">FoodOrder</h5>
+        <div class="top-row px-4 d-flex justify-content-between align-items-center gap-2 bg-light border-bottom">
+            <h5 class="mb-0 text-primary fw-bold d-none d-sm-block">FoodOrder</h5>
 
             @if (_isInitialized)
             {
@@ -19,13 +18,14 @@
             }
         </div>
 
+        <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 py-2 px-4 small" role="note">
+            Fejlesztői változat – a szerepkörváltó még nem bejelentkezés
+        </div>
+
         <article class="content px-4 py-4">
             @if (!_isInitialized)
             {
-                <div class="text-center py-5">
-                    <div class="spinner-border text-primary" role="status"></div>
-                    <p class="mt-3">Betöltés...</p>
-                </div>
+                <LoadingIndicator />
             }
             else
             {
@@ -40,15 +40,16 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            await SessionService.InitializeAsync();
-            await MenuService.InitializeAsync();
-            await CartService.InitializeAsync();
-            await OrderService.InitializeAsync();
+        if (!firstRender) return;
 
-            _isInitialized = true;
-            StateHasChanged();
-        }
+        // Az étlap és a rendelések már a szerveren vannak: a régi localStorage-kulcsokat töröljük.
+        await Storage.RemoveItemAsync(StorageKeys.LegacyDishes);
+        await Storage.RemoveItemAsync(StorageKeys.LegacyOrders);
+
+        await SessionService.InitializeAsync();
+        await CartService.InitializeAsync();
+
+        _isInitialized = true;
+        StateHasChanged();
     }
 }

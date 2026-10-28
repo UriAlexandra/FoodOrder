@@ -114,6 +114,47 @@ public class OrderTests
     }
 
     [Fact]
+    public void GetAllowedNextStatuses_without_courier_does_not_offer_OutForDelivery()
+    {
+        var now = DateTimeOffset.Now;
+        var order = Order.Place("u1", "V", "v@v", "Cím", null, new List<(Dish, int)> { (CreateValidDish(), 1) }, now);
+        order.ChangeStatus(OrderStatus.Accepted, "staff", now);
+        order.ChangeStatus(OrderStatus.Preparing, "staff", now);
+        order.ChangeStatus(OrderStatus.ReadyForPickup, "staff", now);
+
+        Assert.Empty(order.GetAllowedNextStatuses());
+
+        order.AssignCourier(CreateValidCourier());
+
+        Assert.Equal(OrderStatus.OutForDelivery, Assert.Single(order.GetAllowedNextStatuses()));
+    }
+
+    [Fact]
+    public void GetAllowedNextStatuses_for_new_order_offers_Accepted_and_Cancelled()
+    {
+        var order = Order.Place("u1", "V", "v@v", "Cím", null, new List<(Dish, int)> { (CreateValidDish(), 1) }, DateTimeOffset.Now);
+
+        var codes = order.GetAllowedNextStatuses().Select(s => s.Code).OrderBy(c => c).ToList();
+
+        Assert.Equal(new List<string> { "Accepted", "Cancelled" }, codes);
+    }
+
+    [Fact]
+    public void CanAssignCourier_only_in_Accepted_Preparing_or_ReadyForPickup()
+    {
+        var now = DateTimeOffset.Now;
+        var order = Order.Place("u1", "V", "v@v", "Cím", null, new List<(Dish, int)> { (CreateValidDish(), 1) }, now);
+        Assert.False(order.CanAssignCourier);
+
+        order.ChangeStatus(OrderStatus.Accepted, "staff", now);
+        Assert.True(order.CanAssignCourier);
+
+        order.ChangeStatus(OrderStatus.Cancelled, "staff", now);
+        Assert.False(order.CanAssignCourier);
+        Assert.Throws<DomainException>(() => order.AssignCourier(CreateValidCourier()));
+    }
+
+    [Fact]
     public void AssignCourier_InactiveCourier_ThrowsException()
     {
         var lines = new List<(Dish, int)> { (CreateValidDish(), 1) };

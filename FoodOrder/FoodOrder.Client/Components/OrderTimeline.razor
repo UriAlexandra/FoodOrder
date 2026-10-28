@@ -1,0 +1,40 @@
+@* Lépésjelző: a rendelés szokásos útja, a megtett lépéseknél a szerver állapottörténetéből vett időponttal. *@
+<ol class="list-unstyled mb-0">
+    @foreach (var (code, label) in OrderStatusUi.Timeline)
+    {
+        var entry = Order.History.FirstOrDefault(h => h.Status == code);
+        var isCurrent = Order.Status == code;
+        var done = entry is not null;
+
+        <li class="d-flex align-items-center gap-3 mb-2" aria-current="@(isCurrent ? "step" : null)">
+            <span class="badge rounded-pill @(isCurrent ? "text-bg-primary" : done ? "text-bg-success" : "text-bg-light border")"
+                  style="width: 2rem;" aria-hidden="true">@(done ? "✓" : "·")</span>
+            <span class="@(done ? "fw-semibold" : "text-muted")">@label</span>
+            @if (entry is not null)
+            {
+                <small class="text-muted">@HuDateFormatter.Format(entry.ChangedAt)</small>
+            }
+            @if (isCurrent && !Order.IsFinal)
+            {
+                <small class="text-primary">(jelenlegi állapot)</small>
+            }
+        </li>
+    }
+
+    @if (Order.Status == OrderStatusUi.Cancelled)
+    {
+        var cancelled = Order.History.FirstOrDefault(h => h.Status == OrderStatusUi.Cancelled);
+        <li class="d-flex align-items-center gap-3 mt-3" aria-current="step">
+            <span class="badge rounded-pill text-bg-danger" style="width: 2rem;" aria-hidden="true">✕</span>
+            <span class="fw-semibold text-danger">Lemondva</span>
+            @if (cancelled is not null)
+            {
+                <small class="text-muted">@HuDateFormatter.Format(cancelled.ChangedAt)</small>
+            }
+        </li>
+    }
+</ol>
+
+@code {
+    [Parameter, EditorRequired] public OrderDto Order { get; set; } = default!;
+}

@@ -1,47 +1,80 @@
-﻿@page "/rendeleseim"
+@page "/rendeleseim"
 @inject IOrderService OrderService
 @inject ISessionService SessionService
 @implements IDisposable
 
 <PageTitle>Rendeléseim</PageTitle>
 
-<h2 class="mb-4">Saját Rendeléseim</h2>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <h2 class="mb-0">Rendeléseim</h2>
+    @if (SessionService.CurrentRole == UserRole.Customer)
+    {
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@_loading">Frissítés</button>
+    }
+</div>
 
 @if (SessionService.CurrentRole != UserRole.Customer)
 {
-    <div class="alert alert-warning">Vásárlóként jelentkezz be a saját rendeléseid megtekintéséhez!</div>
+    <div class="alert alert-warning">A saját rendelések csak vásárlóként láthatók. Válts vásárló szerepkörre a felső sávban.</div>
 }
-
-@{
-    var myOrders = OrderService.Orders.Where(o => o.CustomerName == "Kiss Anna").ToList();
+else if (_loading && _orders.Count == 0)
+{
+    <LoadingIndicator Text="Rendelések betöltése..." />
 }
-
-@if (!myOrders.Any())
+else if (_error is not null)
+{
+    <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
+}
+else if (_orders.Count == 0)
 {
     <p class="text-muted">Még nem adtál le rendelést.</p>
+    <a href="" class="btn btn-outline-primary">Tovább az étlapra</a>
 }
 else
 {
     <div class="row row-cols-1 g-4">
-        @foreach (var order in myOrders)
+        @foreach (var order in _orders)
         {
             <div class="col">
-                <OrderCard Order="order" IsStaffView="false" />
+                <OrderCard Order="order">
+                    <a class="btn btn-sm btn-outline-primary" href="@($"rendeleseim/{order.Id}")">Követés</a>
+                </OrderCard>
             </div>
         }
     </div>
 }
 
 @code {
-    protected override void OnInitialized()
+    private List<OrderDto> _orders = new();
+    private bool _loading = true;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
     {
-        OrderService.OnChange += StateHasChanged;
         SessionService.OnChange += StateHasChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _orders = await OrderService.GetOrdersAsync(DemoUsers.CustomerEmail);
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     public void Dispose()
     {
-        OrderService.OnChange -= StateHasChanged;
         SessionService.OnChange -= StateHasChanged;
     }
 }

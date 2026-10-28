@@ -1,42 +1,256 @@
-﻿@page "/etterem/rendelesek"
+@page "/etterem/rendelesek"
 @inject IOrderService OrderService
+@inject ICourierService CourierService
 @inject ISessionService SessionService
 @implements IDisposable
 
-<PageTitle>Beérkezett Rendelések</PageTitle>
+<PageTitle>Beérkezett rendelések</PageTitle>
 
-<h2 class="mb-4">Beérkezett Rendelések (Éttermi nézet)</h2>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h2 class="mb-0">Beérkezett rendelések</h2>
+    @if (SessionService.CurrentRole == UserRole.Staff)
+    {
+        <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="LoadAsync" disabled="@_loading">Frissítés</button>
+    }
+</div>
 
 @if (SessionService.CurrentRole != UserRole.Staff)
 {
-    <div class="alert alert-danger">Nincs jogosultságod ehhez az oldalhoz!</div>
-}
-else if (!OrderService.Orders.Any())
-{
-    <p class="text-muted">Nincsenek beérkezett rendelések.</p>
+    <div class="alert alert-danger">Ez az oldal csak éttermi dolgozóként érhető el. Válts szerepkört a felső sávban.</div>
 }
 else
 {
-    <div class="row row-cols-1 g-4">
-        @foreach (var order in OrderService.Orders)
+    <div class="btn-group flex-wrap mb-3" role="group" aria-label="Szűrés állapot szerint">
+        @foreach (var filter in Enum.GetValues<OrderFilter>())
         {
-            <div class="col">
-                <OrderCard Order="order" IsStaffView="true" />
-            </div>
+            <button type="button"
+                    class="btn btn-sm @(_filter == filter ? "btn-primary" : "btn-outline-primary")"
+                    aria-pressed="@(_filter == filter ? "true" : "false")"
+                    @onclick="() => _filter = filter">
+                @FilterLabel(filter) (@Apply(filter).Count())
+            </button>
         }
     </div>
+
+    <ErrorAlert Message="@_warning" Warning="true" />
+
+    @if (_loading && _orders.Count == 0)
+    {
+        <LoadingIndicator Text="Rendelések betöltése..." />
+    }
+    else if (_error is not null)
+    {
+        <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
+    }
+    else if (!Apply(_filter).Any())
+    {
+        <p class="text-muted">Ebben a nézetben nincs rendelés.</p>
+    }
+    else
+    {
+        <div class="row row-cols-1 g-4">
+            @foreach (var order in Apply(_filter))
+            {
+                var busy = _busyOrders.Contains(order.Id);
+                <div class="col">
+                    <OrderCard Order="order" IsStaffView="true">
+                        @* Csak a szerver által felkínált állapotokra lehet váltani. *@
+                        @foreach (var next in order.AllowedNextStatuses)
+                        {
+                            <button type="button"
+                                    class="btn btn-sm @(next.Code == OrderStatusUi.Cancelled ? "btn-outline-danger" : "btn-primary")"
+                                    disabled="@busy"
+                                    @onclick="() => RequestStatusChangeAsync(order, next)">
+                                @(next.Code == OrderStatusUi.Cancelled ? "Lemondás" : $"→ {next.DisplayName}")
+                            </button>
+                        }
+
+                        @if (order.CanAssignCourier)
+                        {
+                            <div class="input-group input-group-sm w-auto">
+                                <label class="input-group-text" for="courier-@order.Id">Futár</label>
+                                <select id="courier-@order.Id" class="form-select" disabled="@busy"
+                                        value="@SelectedCourier(order)"
+                                        @onchange="e => SelectCourier(order.Id, e)">
+                                    <option value="">Válassz...</option>
+                                    @foreach (var courier in ActiveCouriers)
+                                    {
+                                        <option value="@courier.Id">@courier.Name</option>
+                                    }
+                                </select>
+                                <button type="button" class="btn btn-outline-primary"
+                                        disabled="@(busy || !_selectedCourier.ContainsKey(order.Id))"
+                                        @onclick="() => AssignCourierAsync(order)">
+                                    Hozzárendelés
+                                </button>
+                            </div>
+                            @if (order.CourierId is null)
+                            {
+                                <small class="text-muted">A kiszállításhoz előbb rendelj hozzá futárt.</small>
+                            }
+                        }
+
+                        @if (busy)
+                        {
+                            <span class="spinner-border spinner-border-sm text-secondary" role="status">
+                                <span class="visually-hidden">Mentés...</span>
+                            </span>
+                        }
+                    </OrderCard>
+                </div>
+            }
+        </div>
+    }
 }
 
+<ConfirmDialog IsOpen="@(_pendingCancel is not null)"
+               Title="Rendelés lemondása"
+               Message="@($"Biztosan lemondod a(z) #{_pendingCancel?.Id} rendelést? Ez nem vonható vissza.")"
+               ConfirmText="Lemondás"
+               OnConfirm="ConfirmCancelAsync"
+               OnCancel="() => _pendingCancel = null" />
+
 @code {
-    protected override void OnInitialized()
+    private enum OrderFilter { Active, Delivered, Cancelled, All }
+
+    private OrderFilter _filter = OrderFilter.Active;
+    private List<OrderDto> _orders = new();
+    private List<CourierDto> _couriers = new();
+    private readonly HashSet<int> _busyOrders = new();
+    private readonly Dictionary<int, int> _selectedCourier = new();
+    private OrderDto? _pendingCancel;
+    private bool _loading = true;
+    private string? _error;
+    private string? _warning;
+
+    private IEnumerable<CourierDto> ActiveCouriers => _couriers.Where(c => c.IsActive);
+
+    protected override async Task OnInitializedAsync()
     {
-        OrderService.OnChange += StateHasChanged;
         SessionService.OnChange += StateHasChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            _orders = await OrderService.GetOrdersAsync();
+            _couriers = await CourierService.GetCouriersAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private IEnumerable<OrderDto> Apply(OrderFilter filter) => filter switch
+    {
+        OrderFilter.Active => _orders.Where(o => !o.IsFinal),
+        OrderFilter.Delivered => _orders.Where(o => o.Status == OrderStatusUi.Delivered),
+        OrderFilter.Cancelled => _orders.Where(o => o.Status == OrderStatusUi.Cancelled),
+        _ => _orders
+    };
+
+    private static string FilterLabel(OrderFilter filter) => filter switch
+    {
+        OrderFilter.Active => "Aktív",
+        OrderFilter.Delivered => "Kézbesített",
+        OrderFilter.Cancelled => "Lemondott",
+        _ => "Mind"
+    };
+
+    private string SelectedCourier(OrderDto order) =>
+        _selectedCourier.TryGetValue(order.Id, out var id) ? id.ToString()
+        : order.CourierId?.ToString() ?? string.Empty;
+
+    private void SelectCourier(int orderId, ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var courierId))
+            _selectedCourier[orderId] = courierId;
+        else
+            _selectedCourier.Remove(orderId);
+    }
+
+    private async Task RequestStatusChangeAsync(OrderDto order, StatusOptionDto next)
+    {
+        if (next.Code == OrderStatusUi.Cancelled)
+        {
+            _pendingCancel = order; // megerősítés után folytatjuk
+            return;
+        }
+
+        await RunOnOrderAsync(order, () => OrderService.ChangeStatusAsync(order.Id, next.Code, order.Version));
+    }
+
+    private async Task ConfirmCancelAsync()
+    {
+        var order = _pendingCancel;
+        _pendingCancel = null;
+        if (order is not null)
+            await RunOnOrderAsync(order, () => OrderService.ChangeStatusAsync(order.Id, OrderStatusUi.Cancelled, order.Version));
+    }
+
+    private async Task AssignCourierAsync(OrderDto order)
+    {
+        if (!_selectedCourier.TryGetValue(order.Id, out var courierId))
+            return;
+
+        await RunOnOrderAsync(order, () => OrderService.AssignCourierAsync(order.Id, courierId, order.Version));
+        _selectedCourier.Remove(order.Id);
+    }
+
+    /// <summary>Művelet egy rendelésen: siker esetén csak az érintett kártya cserélődik.</summary>
+    private async Task RunOnOrderAsync(OrderDto order, Func<Task<OrderDto>> action)
+    {
+        _busyOrders.Add(order.Id);
+        _warning = null;
+        try
+        {
+            ReplaceOrder(await action());
+        }
+        catch (ApiException ex) when (ex.IsConflict)
+        {
+            _warning = $"#{order.Id}: {ex.Message} A rendelést újratöltöttük.";
+            await ReloadOrderAsync(order.Id);
+        }
+        catch (ApiException ex)
+        {
+            _warning = $"#{order.Id}: {ex.Message}";
+        }
+        finally
+        {
+            _busyOrders.Remove(order.Id);
+        }
+    }
+
+    private async Task ReloadOrderAsync(int orderId)
+    {
+        try
+        {
+            ReplaceOrder(await OrderService.GetOrderAsync(orderId));
+        }
+        catch (ApiException ex)
+        {
+            _warning += $" ({ex.Message})";
+        }
+    }
+
+    private void ReplaceOrder(OrderDto updated)
+    {
+        var index = _orders.FindIndex(o => o.Id == updated.Id);
+        if (index >= 0)
+            _orders[index] = updated;
     }
 
     public void Dispose()
     {
-        OrderService.OnChange -= StateHasChanged;
         SessionService.OnChange -= StateHasChanged;
     }
 }

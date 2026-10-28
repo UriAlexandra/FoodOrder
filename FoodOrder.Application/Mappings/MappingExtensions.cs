@@ -38,14 +38,17 @@ public static class MappingExtensions
         CourierPhone = courier?.Phone,
         Total = order.Total.Amount,
         Version = order.Version,
+        IsFinal = order.Status.IsFinal,
+        CanAssignCourier = order.CanAssignCourier,
         Items = order.Items.Select(i => new OrderItemDto
         {
             DishName = i.DishName,
             Price = i.UnitPrice.Amount,
             Quantity = i.Quantity
         }).ToList(),
-        AllowedNextStatuses = order.Status.AllowedNext
-            .Select(code => OrderStatus.FromCode(code))
+        // A választható következő állapotokat a domain adja (futár-feltétellel együtt),
+        // így a kliensnek nincs saját átmenettáblája.
+        AllowedNextStatuses = order.GetAllowedNextStatuses()
             .Select(s => new StatusOptionDto { Code = s.Code, DisplayName = s.DisplayName })
             .ToList(),
         History = order.StatusHistory.Select(h => new StatusHistoryEntryDto

@@ -1,0 +1,197 @@
+@page "/rendeleseim/{Id:int}"
+@inject IOrderService OrderService
+@implements IDisposable
+
+<PageTitle>Rendelés #@Id</PageTitle>
+
+<a href="rendeleseim" class="btn btn-link px-0 mb-3">← Vissza a rendeléseimhez</a>
+
+@if (_order is null)
+{
+    if (_loading)
+    {
+        <LoadingIndicator Text="Rendelés betöltése..." />
+    }
+    else
+    {
+        <ErrorAlert Message="@(_error ?? "A rendelés nem található.")" OnRetry="LoadAsync" />
+    }
+}
+else
+{
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <h2 class="mb-0">Rendelés #@_order.Id</h2>
+        <StatusBadge Status="@_order.Status" Text="@_order.StatusDisplayName" />
+    </div>
+
+    <ErrorAlert Message="@_error" Warning="true" />
+
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light fw-bold">Rendelés útja</div>
+                <div class="card-body">
+                    <OrderTimeline Order="_order" />
+                </div>
+            </div>
+
+            @if (_order.Status == OrderStatusUi.OutForDelivery && _order.CourierName is not null)
+            {
+                <div class="alert alert-primary mt-3 mb-0" role="status">
+                    <strong>A futár úton van:</strong> @_order.CourierName,
+                    <a href="@($"tel:{_order.CourierPhone}")">@HuPhoneFormatter.Format(_order.CourierPhone)</a>
+                </div>
+            }
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light fw-bold">Tételek</div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            @foreach (var item in _order.Items)
+                            {
+                                <tr>
+                                    <td class="text-nowrap" style="width: 3rem;">@item.Quantity ×</td>
+                                    <td>@item.DishName</td>
+                                    <td class="text-end text-nowrap">@HufFormatter.Format(item.Price * item.Quantity)</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" class="text-end fw-bold">Végösszeg</td>
+                                <td class="text-end fw-bold text-success text-nowrap">@HufFormatter.Format(_order.Total)</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    <p class="small text-muted mt-3 mb-0">
+                        Szállítási cím: @_order.DeliveryAddress<br />
+                        Leadva: @HuDateFormatter.Format(_order.PlacedAt)
+                    </p>
+                </div>
+            </div>
+
+            @if (CanCancel)
+            {
+                <button type="button" class="btn btn-outline-danger mt-3" disabled="@_busy" @onclick="() => _confirmCancel = true">
+                    Rendelés lemondása
+                </button>
+            }
+        </div>
+    </div>
+
+    @if (!_order.IsFinal)
+    {
+        <p class="small text-muted mt-4 mb-0">
+            Az oldal 10 másodpercenként magától frissül.
+            @if (_lastRefresh is not null)
+            {
+                <span>Utolsó frissítés: @_lastRefresh.Value.ToString("HH:mm:ss")</span>
+            }
+        </p>
+    }
+}
+
+<ConfirmDialog IsOpen="_confirmCancel"
+               Title="Rendelés lemondása"
+               Message="Biztosan lemondod a rendelést? Ez nem vonható vissza."
+               ConfirmText="Lemondás"
+               OnConfirm="CancelOrderAsync"
+               OnCancel="() => _confirmCancel = false" />
+
+@code {
+    [Parameter] public int Id { get; set; }
+
+    private OrderDto? _order;
+    private bool _loading = true;
+    private bool _busy;
+    private bool _confirmCancel;
+    private string? _error;
+    private DateTime? _lastRefresh;
+
+    private readonly CancellationTokenSource _cts = new();
+    private PeriodicTimer? _timer;
+
+    // Lemondás csak akkor, ha a szerver felkínálja (Leadva vagy Elfogadva állapotban).
+    private bool CanCancel =>
+        _order?.AllowedNextStatuses.Any(s => s.Code == OrderStatusUi.Cancelled) == true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        _ = PollAsync(_cts.Token);
+    }
+
+    // 10 másodperces frissítés; a 6. héten SignalR váltja ki.
+    private async Task PollAsync(CancellationToken token)
+    {
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        try
+        {
+            while (await _timer.WaitForNextTickAsync(token))
+            {
+                if (_order?.IsFinal == true || _busy || _confirmCancel)
+                    continue;
+
+                await LoadAsync();
+                if (!token.IsCancellationRequested)
+                    await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Az oldal elhagyásakor leáll.
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _order = await OrderService.GetOrderAsync(Id);
+            _error = null;
+            _lastRefresh = DateTime.Now;
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task CancelOrderAsync()
+    {
+        _confirmCancel = false;
+        if (_order is null) return;
+
+        _busy = true;
+        try
+        {
+            _order = await OrderService.ChangeStatusAsync(_order.Id, OrderStatusUi.Cancelled, _order.Version);
+            _error = null;
+        }
+        catch (ApiException ex)
+        {
+            await LoadAsync();
+            _error = ex.IsConflict
+                ? $"{ex.Message} A rendelést újratöltöttük, nézd meg az aktuális állapotát."
+                : ex.Message;
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _timer?.Dispose();
+        _cts.Dispose();
+    }
+}

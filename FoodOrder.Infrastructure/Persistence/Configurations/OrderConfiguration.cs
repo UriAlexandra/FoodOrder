@@ -21,8 +21,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
         // Optimista zárolás: a Version minden módosításkor nő, a mentés ellenőrzi.
         builder.Property(x => x.Version).IsConcurrencyToken();
 
-        // A végösszeg a tételekből számolódik, nem tároljuk.
+        // Számolt értékek, nem tároljuk őket.
         builder.Ignore(x => x.Total);
+        builder.Ignore(x => x.CanAssignCourier);
 
         builder.HasMany(x => x.Items)
                .WithOne()

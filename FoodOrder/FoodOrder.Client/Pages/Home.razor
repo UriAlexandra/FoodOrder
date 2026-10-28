@@ -1,4 +1,4 @@
-﻿@page "/"
+@page "/"
 @inject IMenuService MenuService
 @inject ICartService CartService
 @inject ISessionService SessionService
@@ -6,46 +6,83 @@
 
 <PageTitle>Étlap</PageTitle>
 
-<h2 class="mb-4">Aktuális Kínálatunk</h2>
+<h2 class="mb-4">Étlap</h2>
 
 @if (SessionService.CurrentRole != UserRole.Customer)
 {
-    <div class="alert alert-warning">
-        Jelenleg éttermi dolgozóként vagy bejelentkezve. A rendeléshez válts vásárló szerepkörre!
+    <div class="alert alert-info">Éttermi dolgozóként nézed az étlapot. Rendeléshez válts vásárló szerepkörre.</div>
+}
+
+@if (_addedMessage is not null)
+{
+    <div class="alert alert-success py-2" role="status">@_addedMessage</div>
+}
+
+@if (_loading)
+{
+    <LoadingIndicator Text="Étlap betöltése..." />
+}
+else if (_error is not null)
+{
+    <ErrorAlert Message="@_error" OnRetry="LoadAsync" />
+}
+else if (!AvailableDishes.Any())
+{
+    <p class="text-muted">Jelenleg nincs rendelhető étel.</p>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        @foreach (var dish in AvailableDishes)
+        {
+            <div class="col">
+                <DishCard Dish="dish"
+                          ShowCartActions="@(SessionService.CurrentRole == UserRole.Customer)"
+                          OnAddToCart="HandleAddToCart" />
+            </div>
+        }
     </div>
 }
 
-<div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-    @foreach (var dish in MenuService.Dishes.Where(d => d.IsAvailable))
-    {
-        <div class="col">
-            <DishCard Dish="dish"
-                      ShowCartActions="@(SessionService.CurrentRole == UserRole.Customer)"
-                      OnAddToCart="HandleAddToCart" />
-        </div>
-    }
-</div>
-
-@if (!MenuService.Dishes.Any(d => d.IsAvailable))
-{
-    <p class="text-muted mt-3">Jelenleg nincs elérhető étel az étlapon.</p>
-}
-
 @code {
-    protected override void OnInitialized()
+    private bool _loading = true;
+    private string? _error;
+    private string? _addedMessage;
+
+    private IEnumerable<DishDto> AvailableDishes => MenuService.Dishes.Where(d => d.IsAvailable);
+
+    protected override async Task OnInitializedAsync()
     {
-        MenuService.OnChange += StateHasChanged;
         SessionService.OnChange += StateHasChanged;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            await MenuService.LoadAsync();
+        }
+        catch (ApiException ex)
+        {
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
     }
 
     private async Task HandleAddToCart((DishDto dish, int quantity) payload)
     {
         await CartService.AddToCartAsync(payload.dish, payload.quantity);
+        _addedMessage = $"{payload.quantity} × {payload.dish.Name} a kosárba került.";
     }
 
     public void Dispose()
     {
-        MenuService.OnChange -= StateHasChanged;
         SessionService.OnChange -= StateHasChanged;
     }
 }

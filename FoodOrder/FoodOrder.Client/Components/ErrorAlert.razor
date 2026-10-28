@@ -1,0 +1,28 @@
+@if (!string.IsNullOrWhiteSpace(Message))
+{
+    <div class="alert @(Warning ? "alert-warning" : "alert-danger") d-flex flex-wrap justify-content-between align-items-start gap-2" role="alert">
+        <div>
+            <div>@Message</div>
+            @if (Details is { Count: > 0 })
+            {
+                <ul class="mb-0 mt-1 small">
+                    @foreach (var detail in Details)
+                    {
+                        <li>@detail</li>
+                    }
+                </ul>
+            }
+        </div>
+        @if (OnRetry.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="OnRetry">Újrapróbálás</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public string? Message { get; set; }
+    [Parameter] public IReadOnlyList<string>? Details { get; set; }
+    [Parameter] public bool Warning { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

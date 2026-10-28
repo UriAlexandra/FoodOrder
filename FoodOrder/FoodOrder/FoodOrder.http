@@ -97,3 +97,26 @@ Content-Type: application/json
   "newStatus": "Cancelled",
   "expectedVersion": 1
 }
+
+### 12. Egy vásárló rendelései (4. hét: a "Rendeléseim" oldal ezt hívja)
+GET {{HostAddress}}/api/orders?customerEmail=anna@example.com
+
+### 13. Futárok listája
+GET {{HostAddress}}/api/couriers
+
+### 14. Új futár (hibás telefonszámmal 400-at ad)
+POST {{HostAddress}}/api/couriers
+Content-Type: application/json
+
+{
+  "name": "Szabó Dénes",
+  "phone": "+36 70 555 1234"
+}
+
+### 15. Futár inaktiválása (inaktív futár nem rendelhető ki)
+PATCH {{HostAddress}}/api/couriers/2/active
+Content-Type: application/json
+
+{
+  "isActive": false
+}
