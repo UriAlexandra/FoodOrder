@@ -2,12 +2,20 @@
 
 public class OrderDto
 {
-    public string OrderId { get; set; } = string.Empty;
+    public int Id { get; set; }
+    public DateTimeOffset PlacedAt { get; set; }
     public string CustomerName { get; set; } = string.Empty;
     public string DeliveryAddress { get; set; } = string.Empty;
-    public string? Notes { get; set; }
+    public string? Note { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string StatusDisplayName { get; set; } = string.Empty;
+    public int? CourierId { get; set; }
+    public string? CourierName { get; set; }
+    public string? CourierPhone { get; set; }
+    public decimal Total { get; set; }
+    public int Version { get; set; }
+
     public List<OrderItemDto> Items { get; set; } = new();
-    public decimal TotalPrice { get; set; }
-    public OrderStatusCode Status { get; set; } = OrderStatusCode.Placed;
-    public DateTime CreatedAt { get; set; } = DateTime.Now;
+    public List<StatusOptionDto> AllowedNextStatuses { get; set; } = new();
+    public List<StatusHistoryEntryDto> History { get; set; } = new();
 }

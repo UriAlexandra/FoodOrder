@@ -1,0 +1,46 @@
+﻿<div class="card shadow-sm mb-4 @(IsStaffView ? "border-0 border-start border-5 border-primary" : "")">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <span class="fw-bold">Rendelés: #@Order.Id</span>
+        <span class="badge bg-primary">@Order.StatusDisplayName</span>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-5 mb-3 mb-md-0">
+                @if (IsStaffView)
+                {
+                    <h6 class="text-muted fw-bold">Vásárló adatai:</h6>
+                    <p class="mb-1"><strong>Név:</strong> @Order.CustomerName</p>
+                }
+                <p class="mb-1 small"><strong>Cím:</strong> @Order.DeliveryAddress</p>
+                @if (!string.IsNullOrWhiteSpace(Order.Note))
+                {
+                    <p class="mb-1 small @(IsStaffView ? "text-danger" : "")"><strong>Megjegyzés:</strong> @Order.Note</p>
+                }
+                <p class="mb-1 small"><strong>Időpont:</strong> @Order.PlacedAt.ToString("yyyy. MM. dd. HH:mm")</p>
+            </div>
+            <div class="col-md-7 @(IsStaffView ? "bg-light p-3 rounded" : "")">
+                <h6 class="text-muted fw-bold mb-2">Tételek:</h6>
+                <table class="table table-sm table-borderless mb-0">
+                    <tbody>
+                        @foreach (var item in Order.Items)
+                        {
+                            <tr>
+                                <td class="fw-semibold" style="width: 40px;">@item.Quantity x</td>
+                                <td>@item.DishName</td>
+                                <td class="text-end small">@HufFormatter.Format(item.Price * item.Quantity)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="card-footer bg-white text-end">
+        <span class="fs-5">Végösszeg: <strong class="text-success">@HufFormatter.Format(Order.Total)</strong></span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public OrderDto Order { get; set; } = default!;
+    [Parameter] public bool IsStaffView { get; set; }
+}

@@ -1,4 +1,8 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@inject ISessionService SessionService
+@inject ICartService CartService
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="">FoodOrder</a>
     </div>
@@ -7,24 +11,55 @@
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill-nav-menu" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
-
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
+    <nav class="flex-column">
+        @if (SessionService.CurrentRole == UserRole.Customer)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Étlap
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="kosar">
+                    <span class="bi bi-cart-fill-nav-menu" aria-hidden="true"></span> Kosár
+                    @if (CartService.Items.Any())
+                    {
+                        <span class="badge bg-danger ms-2">@CartService.Items.Sum(c => c.Quantity)</span>
+                    }
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="rendeleseim">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Rendeléseim
+                </NavLink>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="etterem/etlap">
+                    <span class="bi bi-journal-text-nav-menu" aria-hidden="true"></span> Étlap kezelése
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="etterem/rendelesek">
+                    <span class="bi bi-inbox-fill-nav-menu" aria-hidden="true"></span> Beérkezett rendelések
+                </NavLink>
+            </div>
+        }
     </nav>
 </div>
 
+@code {
+    protected override void OnInitialized()
+    {
+        SessionService.OnChange += StateHasChanged;
+        CartService.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        SessionService.OnChange -= StateHasChanged;
+        CartService.OnChange -= StateHasChanged;
+    }
+}

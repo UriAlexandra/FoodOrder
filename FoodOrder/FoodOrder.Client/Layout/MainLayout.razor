@@ -1,6 +1,8 @@
 ﻿@inherits LayoutComponentBase
-@inject FoodOrderStore Store
-@implements IDisposable
+@inject ISessionService SessionService
+@inject IMenuService MenuService
+@inject ICartService CartService
+@inject IOrderService OrderService
 
 <div class="page">
     <div class="sidebar">
@@ -11,20 +13,14 @@
         <div class="top-row px-4 d-flex justify-content-between align-items-center bg-light border-bottom">
             <h5 class="mb-0 text-primary fw-bold">FoodOrder</h5>
 
-            @if (Store.IsInitialized)
+            @if (_isInitialized)
             {
-                <div class="d-flex align-items-center">
-                    <label class="me-2 fw-semibold text-muted">Szerepkör:</label>
-                    <select class="form-select form-select-sm w-auto" value="@Store.CurrentRole.ToString()" @onchange="OnRoleChanged">
-                        <option value="Customer">Kiss Anna – Vásárló</option>
-                        <option value="Staff">Nagy Péter – Éttermi dolgozó</option>
-                    </select>
-                </div>
+                <RoleSwitcher />
             }
         </div>
 
         <article class="content px-4 py-4">
-            @if (!Store.IsInitialized)
+            @if (!_isInitialized)
             {
                 <div class="text-center py-5">
                     <div class="spinner-border text-primary" role="status"></div>
@@ -40,26 +36,19 @@
 </div>
 
 @code {
+    private bool _isInitialized;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await Store.InitializeAsync();
-            Store.OnChange += StateHasChanged;
+            await SessionService.InitializeAsync();
+            await MenuService.InitializeAsync();
+            await CartService.InitializeAsync();
+            await OrderService.InitializeAsync();
+
+            _isInitialized = true;
             StateHasChanged();
         }
-    }
-
-    private async Task OnRoleChanged(ChangeEventArgs e)
-    {
-        if (Enum.TryParse<UserRole>(e.Value?.ToString(), out var role))
-        {
-            await Store.SetRoleAsync(role);
-        }
-    }
-
-    public void Dispose()
-    {
-        Store.OnChange -= StateHasChanged;
     }
 }

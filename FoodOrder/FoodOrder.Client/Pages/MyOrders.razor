@@ -1,18 +1,19 @@
 ﻿@page "/rendeleseim"
-@inject FoodOrderStore Store
+@inject IOrderService OrderService
+@inject ISessionService SessionService
 @implements IDisposable
 
 <PageTitle>Rendeléseim</PageTitle>
 
 <h2 class="mb-4">Saját Rendeléseim</h2>
 
-@if (Store.CurrentRole != UserRole.Customer)
+@if (SessionService.CurrentRole != UserRole.Customer)
 {
     <div class="alert alert-warning">Vásárlóként jelentkezz be a saját rendeléseid megtekintéséhez!</div>
 }
 
 @{
-    var myOrders = Store.Orders.Where(o => o.CustomerName == "Kiss Anna").ToList();
+    var myOrders = OrderService.Orders.Where(o => o.CustomerName == "Kiss Anna").ToList();
 }
 
 @if (!myOrders.Any())
@@ -25,37 +26,7 @@ else
         @foreach (var order in myOrders)
         {
             <div class="col">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                        <span class="fw-bold">Rendelés: @order.OrderId</span>
-                        <span class="badge bg-primary">Leadva</span>
-                    </div>
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-3 mb-md-0">
-                                <h6 class="fw-bold text-muted mb-2">Tételek:</h6>
-                                <ul class="list-unstyled mb-0">
-                                    @foreach (var item in order.Items)
-                                    {
-                                        <li>@item.Quantity x @item.DishName <span class="text-muted small">(@HufFormatter.Format(item.Price))</span></li>
-                                    }
-                                </ul>
-                            </div>
-                            <div class="col-md-6">
-                                <h6 class="fw-bold text-muted mb-2">Részletek:</h6>
-                                <p class="mb-1 small"><strong>Cím:</strong> @order.DeliveryAddress</p>
-                                @if (!string.IsNullOrWhiteSpace(order.Notes))
-                                {
-                                    <p class="mb-1 small"><strong>Megjegyzés:</strong> @order.Notes</p>
-                                }
-                                <p class="mb-1 small"><strong>Időpont:</strong> @order.CreatedAt.ToString("yyyy. MM. dd. HH:mm")</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-white text-end">
-                        <span class="fs-5">Végösszeg: <strong class="text-success">@HufFormatter.Format(order.TotalPrice)</strong></span>
-                    </div>
-                </div>
+                <OrderCard Order="order" IsStaffView="false" />
             </div>
         }
     </div>
@@ -64,11 +35,13 @@ else
 @code {
     protected override void OnInitialized()
     {
-        Store.OnChange += StateHasChanged;
+        OrderService.OnChange += StateHasChanged;
+        SessionService.OnChange += StateHasChanged;
     }
 
     public void Dispose()
     {
-        Store.OnChange -= StateHasChanged;
+        OrderService.OnChange -= StateHasChanged;
+        SessionService.OnChange -= StateHasChanged;
     }
 }

@@ -1,4 +1,8 @@
 <Solution>
+  <Project Path="FoodOrder.Application/FoodOrder.Application.csproj" Id="706d762a-2390-4561-ae2b-f49381c1afcf" />
+  <Project Path="FoodOrder.Domain.Tests/FoodOrder.Domain.Tests.csproj" Id="7327566d-3dfb-4ad9-9636-a98eea877c21" />
+  <Project Path="FoodOrder.Domain/FoodOrder.Domain.csproj" Id="afcd1b98-bea7-4922-9bc8-49eb3bc179c2" />
+  <Project Path="FoodOrder.Infrastructure/FoodOrder.Infrastructure.csproj" Id="f93ff652-fda3-4b5e-9827-25cb69175888" />
   <Project Path="FoodOrder.Shared/FoodOrder.Shared.csproj" />
   <Project Path="FoodOrder/FoodOrder.Client/FoodOrder.Client.csproj" />
   <Project Path="FoodOrder/FoodOrder/FoodOrder.csproj" />

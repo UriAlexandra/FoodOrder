@@ -8,5 +8,11 @@ public enum UserRole
 
 public enum OrderStatusCode
 {
-    Placed
+    Placed,
+    Accepted,
+    Preparing,
+    ReadyForPickup,
+    OutForDelivery,
+    Delivered,
+    Cancelled
 }

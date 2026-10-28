@@ -1,0 +1,128 @@
+﻿@page "/kosar"
+@using System.ComponentModel.DataAnnotations
+@inject ICartService CartService
+@inject IOrderService OrderService
+@implements IDisposable
+
+<PageTitle>Kosár</PageTitle>
+
+<h2 class="mb-4">Kosár tartalma</h2>
+
+@if (SuccessOrderId != null)
+{
+    <div class="alert alert-success p-4 shadow-sm text-center">
+        <h4 class="alert-heading">Köszönjük a rendelést!</h4>
+        <p class="mb-0">Sikeresen rögzítettük. Rendelési azonosító: <strong>@SuccessOrderId</strong></p>
+        <hr />
+        <a href="rendeleseim" class="btn btn-success mt-2">Rendeléseim megtekintése</a>
+    </div>
+}
+else if (!CartService.Items.Any())
+{
+    <div class="alert alert-info">A kosarad jelenleg üres.</div>
+    <a href="" class="btn btn-outline-primary">Tovább az étlapra</a>
+}
+else
+{
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="table-responsive shadow-sm bg-white rounded p-3 mb-4">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Étel</th>
+                            <th style="width: 130px;">Mennyiség</th>
+                            <th class="text-end">Egységár</th>
+                            <th class="text-end">Összesen</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in CartService.Items)
+                        {
+                            <CartLine Item="item"
+                                      OnUpdateQuantity="HandleUpdateQuantity"
+                                      OnRemove="HandleRemoveItem" />
+                        }
+                    </tbody>
+                    <tfoot class="border-top">
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold fs-5">Végösszeg:</td>
+                            <td class="text-end fw-bold fs-5 text-success">
+                                @HufFormatter.Format(CartService.Items.Sum(c => c.Dish.Price * c.Quantity))
+                            </td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light fw-bold">Szállítási adatok</div>
+                <div class="card-body">
+                    <EditForm Model="CheckoutData" OnValidSubmit="PlaceOrder">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label">Szállítási cím</label>
+                            <InputText class="form-control" @bind-Value="CheckoutData.Address" placeholder="Pl. 1011 Bp, Fő utca 1." />
+                            <ValidationMessage For="@(() => CheckoutData.Address)" class="text-danger small" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Megjegyzés (opcionális)</label>
+                            <InputTextArea class="form-control" @bind-Value="CheckoutData.Notes" rows="2" placeholder="Kapucsengő, emelet..." />
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
+                            Rendelés leadása
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private CheckoutModel CheckoutData = new();
+    private string? SuccessOrderId;
+
+    protected override void OnInitialized()
+    {
+        CartService.OnChange += StateHasChanged;
+    }
+
+    private async Task HandleUpdateQuantity((int dishId, int newQuantity) payload)
+    {
+        await CartService.UpdateCartItemAsync(payload.dishId, payload.newQuantity);
+    }
+
+    private async Task HandleRemoveItem(int dishId)
+    {
+        await CartService.RemoveFromCartAsync(dishId);
+    }
+
+    private async Task PlaceOrder()
+    {
+        SuccessOrderId = await OrderService.PlaceOrderAsync(CartService.Items, CheckoutData.Address, CheckoutData.Notes);
+        await CartService.ClearCartAsync();
+        CheckoutData = new CheckoutModel();
+    }
+
+    public void Dispose()
+    {
+        CartService.OnChange -= StateHasChanged;
+    }
+
+    public class CheckoutModel
+    {
+        [Required(ErrorMessage = "A szállítási cím megadása kötelező!")]
+        [MinLength(5, ErrorMessage = "A cím túl rövid!")]
+        public string Address { get; set; } = string.Empty;
+
+        public string? Notes { get; set; }
+    }
+}

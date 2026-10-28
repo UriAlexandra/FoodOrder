@@ -1,13 +1,14 @@
-﻿@page "/etterem/etlap"
+@page "/etterem/etlap"
 @using System.ComponentModel.DataAnnotations
-@inject FoodOrderStore Store
+@inject IMenuService MenuService
+@inject ISessionService SessionService
 @implements IDisposable
 
 <PageTitle>Étlap Kezelése</PageTitle>
 
 <h2 class="mb-4">Étlap Kezelése (Éttermi nézet)</h2>
 
-@if (Store.CurrentRole != UserRole.Staff)
+@if (SessionService.CurrentRole != UserRole.Staff)
 {
     <div class="alert alert-danger">Nincs jogosultságod ehhez az oldalhoz! (Válts éttermi dolgozóra)</div>
 }
@@ -27,7 +28,13 @@ else
                     </div>
                     <div class="col-md-3">
                         <label class="form-label">Kategória</label>
-                        <InputText class="form-control" @bind-Value="NewDish.Category" placeholder="Pl. Leves, Főétel..." />
+                        <InputSelect class="form-select" @bind-Value="NewDish.Category">
+                            <option value="">Válassz...</option>
+                            @foreach (var (categoryCode, categoryLabel) in DishCategories.All)
+                            {
+                                <option value="@categoryCode">@categoryLabel</option>
+                            }
+                        </InputSelect>
                         <ValidationMessage For="@(() => NewDish.Category)" class="text-danger small" />
                     </div>
                     <div class="col-md-3">
@@ -61,16 +68,16 @@ else
                 </tr>
             </thead>
             <tbody>
-                @foreach (var dish in Store.Dishes)
+                @foreach (var dish in MenuService.Dishes)
                 {
                     <tr>
                         <td class="fw-bold">@dish.Name</td>
-                        <td><span class="badge bg-secondary">@dish.Category</span></td>
+                        <td><span class="badge bg-secondary">@DishCategories.Label(dish.Category)</span></td>
                         <td class="small text-muted">@dish.Description</td>
                         <td>@HufFormatter.Format(dish.Price)</td>
                         <td class="text-center">
                             <button class="btn btn-sm @(dish.IsAvailable ? "btn-outline-success" : "btn-outline-danger")"
-                                    @onclick="() => Store.ToggleDishAvailabilityAsync(dish.Id)">
+                                    @onclick="() => MenuService.ToggleDishAvailabilityAsync(dish.Id)">
                                 @(dish.IsAvailable ? "Igen (Kikapcsolás)" : "Nem (Bekapcsolás)")
                             </button>
                         </td>
@@ -86,7 +93,8 @@ else
 
     protected override void OnInitialized()
     {
-        Store.OnChange += StateHasChanged;
+        MenuService.OnChange += StateHasChanged;
+        SessionService.OnChange += StateHasChanged;
     }
 
     private async Task AddNewDish()
@@ -99,13 +107,14 @@ else
             Price = NewDish.Price,
             IsAvailable = true
         };
-        await Store.AddDishAsync(dto);
-        NewDish = new DishFormModel(); // űrlap ürítése
+        await MenuService.AddDishAsync(dto);
+        NewDish = new DishFormModel();
     }
 
     public void Dispose()
     {
-        Store.OnChange -= StateHasChanged;
+        MenuService.OnChange -= StateHasChanged;
+        SessionService.OnChange -= StateHasChanged;
     }
 
     public class DishFormModel
