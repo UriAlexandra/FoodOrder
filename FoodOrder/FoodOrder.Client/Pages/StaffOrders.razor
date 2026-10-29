@@ -2,6 +2,9 @@
 @attribute [Authorize(Roles = AppRoles.Staff)]
 @inject IOrderService OrderService
 @inject ICourierService CourierService
+@inject OrderUpdatesClient Updates
+@inject ToastService Toasts
+@implements IDisposable
 
 <PageTitle>Beérkezett rendelések</PageTitle>
 
@@ -42,7 +45,7 @@ else
         @foreach (var order in Apply(_filter))
         {
             var busy = _busyOrders.Contains(order.Id);
-            <div class="col">
+            <div class="col @(_highlighted.Contains(order.Id) ? "order-new" : null)">
                 <OrderCard Order="order" IsStaffView="true">
                     @* Csak a szerver által felkínált állapotokra lehet váltani. *@
                     @foreach (var next in order.AllowedNextStatuses)
@@ -107,6 +110,8 @@ else
     private List<CourierDto> _couriers = new();
     private readonly HashSet<int> _busyOrders = new();
     private readonly Dictionary<int, int> _selectedCourier = new();
+    private readonly HashSet<int> _highlighted = new();
+    private bool _disposed;
     private OrderDto? _pendingCancel;
     private bool _loading = true;
     private string? _error;
@@ -116,8 +121,57 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Updates.OrderChanged += OnOrderChangedAsync;
+        Updates.Reconnected += OnReconnectedAsync;
         await LoadAsync();
     }
+
+    // Valós idejű frissítés: a megváltozott rendelést újra lekérjük; ha új, a lista elejére kerül kiemelve.
+    private Task OnOrderChangedAsync(OrderChangedEvent change) => InvokeAsync(async () =>
+    {
+        var existing = _orders.FirstOrDefault(o => o.Id == change.OrderId);
+        if (existing is not null && change.Version <= existing.Version)
+            return; // ezt a verziót már mutatjuk (pl. a saját műveletünk válaszából)
+
+        try
+        {
+            var order = await OrderService.GetOrderAsync(change.OrderId);
+            if (_orders.Any(o => o.Id == order.Id))
+            {
+                ReplaceOrder(order);
+            }
+            else
+            {
+                _orders.Insert(0, order);
+                Toasts.Show($"Új rendelés érkezett: #{order.Id}", ToastKind.Success);
+                _ = HighlightAsync(order.Id);
+            }
+            StateHasChanged();
+        }
+        catch (ApiException)
+        {
+            // Ha most nem sikerül, a következő változás vagy a Frissítés gomb pótolja.
+        }
+    });
+
+    private async Task HighlightAsync(int orderId)
+    {
+        _highlighted.Add(orderId);
+        await Task.Delay(TimeSpan.FromSeconds(6));
+        if (_disposed) return;
+        await InvokeAsync(() =>
+        {
+            _highlighted.Remove(orderId);
+            StateHasChanged();
+        });
+    }
+
+    // Újracsatlakozás után a teljes listát újratöltjük, hogy a kimaradt események se vesszenek el.
+    private Task OnReconnectedAsync() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
 
     private async Task LoadAsync()
     {
@@ -233,7 +287,14 @@ else
     private void ReplaceOrder(OrderDto updated)
     {
         var index = _orders.FindIndex(o => o.Id == updated.Id);
-        if (index >= 0)
+        if (index >= 0 && updated.Version >= _orders[index].Version)
             _orders[index] = updated;
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
+        Updates.OrderChanged -= OnOrderChangedAsync;
+        Updates.Reconnected -= OnReconnectedAsync;
     }
 }

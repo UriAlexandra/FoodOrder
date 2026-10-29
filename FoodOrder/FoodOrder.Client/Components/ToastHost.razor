@@ -1,0 +1,31 @@
+@inject ToastService Toasts
+@implements IDisposable
+
+@* Az aria-live régió mindig a DOM-ban van, így a képernyőolvasó az újonnan megjelenő értesítést felolvassa. *@
+<div class="toast-container position-fixed bottom-0 end-0 p-3" aria-live="polite" aria-atomic="false">
+    @foreach (var toast in Toasts.Messages)
+    {
+        <div @key="toast.Id" class="toast show align-items-center border-0 @KindClass(toast.Kind)">
+            <div class="d-flex">
+                <div class="toast-body">@toast.Text</div>
+                <button type="button" class="btn-close me-2 m-auto @(toast.Kind == ToastKind.Warning ? null : "btn-close-white")"
+                        aria-label="Bezárás" @onclick="() => Toasts.Dismiss(toast.Id)"></button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Toasts.OnChange += OnToastsChanged;
+
+    private void OnToastsChanged() => _ = InvokeAsync(StateHasChanged);
+
+    private static string KindClass(ToastKind kind) => kind switch
+    {
+        ToastKind.Success => "text-bg-success",
+        ToastKind.Warning => "text-bg-warning",
+        _ => "text-bg-primary"
+    };
+
+    public void Dispose() => Toasts.OnChange -= OnToastsChanged;
+}

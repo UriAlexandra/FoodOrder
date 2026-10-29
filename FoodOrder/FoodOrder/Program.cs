@@ -3,20 +3,26 @@ using FoodOrder.Application;
 using FoodOrder.Application.Ports;
 using FoodOrder.Components;
 using FoodOrder.Endpoints;
+using FoodOrder.Hubs;
 using FoodOrder.Infrastructure;
 using FoodOrder.Infrastructure.Identity;
 using FoodOrder.Infrastructure.Persistence;
+using FoodOrder.Shared.Realtime;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Rétegek
 builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);   // adatbázis + ASP.NET Core Identity
+builder.Services.AddInfrastructure(builder.Configuration);   // adatbázis, Identity, e-mail-outbox
 builder.Services.AddSingleton<IClock, SystemClock>();
 
 // Bejelentkezés (süti), szerepkör-policy-k, aktuális felhasználó
 builder.Services.AddFoodOrderAuth();
+
+// Valós idejű rendelésértesítés (SignalR)
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IOrderUpdatePublisher, SignalROrderUpdatePublisher>();
 
 // Hibakezelés: minden kivételből ProblemDetails válasz lesz
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -52,9 +58,9 @@ else
     app.UseHsts();
 }
 
-// A HTML-oldalaknál a 404 a „nem található” oldalra visz; az API-válaszokat (/api) nem írjuk át.
+// A HTML-oldalaknál a 404 a „nem található” oldalra visz; az API- és SignalR-válaszokat nem írjuk át.
 app.UseWhen(
-    context => !context.Request.Path.StartsWithSegments("/api"),
+    context => !AuthSetup.IsApiRequest(context.Request.Path),
     branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
 
 app.UseHttpsRedirection();
@@ -73,5 +79,8 @@ app.MapAuthEndpoints();
 app.MapDishesEndpoints();
 app.MapCouriersEndpoints();
 app.MapOrdersEndpoints();
+
+// SignalR hub
+app.MapHub<OrderHub>(OrderHubContract.Path);
 
 app.Run();

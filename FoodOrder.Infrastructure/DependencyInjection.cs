@@ -1,5 +1,7 @@
 using FoodOrder.Application.Ports;
+using FoodOrder.Infrastructure.Email;
 using FoodOrder.Infrastructure.Identity;
+using FoodOrder.Infrastructure.Notifications;
 using FoodOrder.Infrastructure.Persistence;
 using FoodOrder.Infrastructure.Persistence.Repositories;
 using Microsoft.AspNetCore.Identity;
@@ -35,6 +37,16 @@ public static class DependencyInjection
         services.AddScoped<IDishRepository, DishRepository>();
         services.AddScoped<ICourierRepository, CourierRepository>();
         services.AddScoped<IOrderRepository, OrderRepository>();
+
+        // E-mail-értesítés outbox mintával: a handler a rendeléssel együtt menti, a háttérszolgáltatás küldi el.
+        services.AddScoped<INotificationOutbox, EfNotificationOutbox>();
+        services.AddScoped<IOutboxStore, EfOutboxStore>();
+        services.AddScoped<IEmailGateway, MailKitEmailGateway>();
+        services.AddOptions<SmtpOptions>()
+            .Bind(config.GetSection(SmtpOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddHostedService<OutboxProcessor>();
 
         return services;
     }

@@ -6,11 +6,16 @@ using FoodOrder.Shared.Requests;
 
 namespace FoodOrder.Application.Handlers;
 
+/// <summary>
+/// Use case: futár hozzárendelése. E-mail nem megy róla (az állapot nem változik), de a nyitott oldalak
+/// valós idejű jelzést kapnak, hogy a futár mindenhol megjelenjen.
+/// </summary>
 public class AssignCourierHandler(
     IOrderRepository orderRepository,
     ICourierRepository courierRepository,
     IUnitOfWork uow,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    IOrderUpdatePublisher updates)
 {
     public async Task<OrderDto> HandleAsync(int id, AssignCourierRequest request, CancellationToken ct)
     {
@@ -28,6 +33,8 @@ public class AssignCourierHandler(
 
         order.AssignCourier(courier);
         await uow.SaveChangesAsync(ct);
+
+        await updates.PublishOrderChangedAsync(order.Id, order.CustomerId, order.Version);
 
         return order.ToDto(courier, currentUser);
     }

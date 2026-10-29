@@ -1,5 +1,6 @@
 using FoodOrder.Application.Exceptions;
 using FoodOrder.Application.Mappings;
+using FoodOrder.Application.Notifications;
 using FoodOrder.Application.Policies;
 using FoodOrder.Application.Ports;
 using FoodOrder.Domain.ValueObjects;
@@ -11,13 +12,16 @@ namespace FoodOrder.Application.Handlers;
 /// <summary>
 /// Use case: Állapotváltás. Sorrend: látja-e a rendelést (404) → nem változott-e közben (409)
 /// → van-e joga hozzá (403) → megengedett-e az átmenet (domain, 409).
+/// Az e-mail-értesítés az állapotváltással együtt mentődik (outbox), a valós idejű jelzés a mentés után megy ki.
 /// </summary>
 public class ChangeOrderStatusHandler(
     IOrderRepository orderRepository,
     ICourierRepository courierRepository,
     IUnitOfWork uow,
     IClock clock,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    INotificationOutbox outbox,
+    IOrderUpdatePublisher updates)
 {
     public async Task<OrderDto> HandleAsync(int id, ChangeOrderStatusRequest request, CancellationToken ct)
     {
@@ -34,7 +38,10 @@ public class ChangeOrderStatusHandler(
             throw new ForbiddenException("Ehhez az állapotváltáshoz nincs jogosultságod. Vásárlóként csak a még le nem adott (Leadva állapotú) rendelést mondhatod le.");
 
         order.ChangeStatus(nextStatus, currentUser.DisplayName(), clock.Now);
+        outbox.EnqueueOrderEvent(order, OrderEventType.StatusChanged);
         await uow.SaveChangesAsync(ct);
+
+        await updates.PublishOrderChangedAsync(order.Id, order.CustomerId, order.Version);
 
         var courier = order.CourierId is int courierId
             ? await courierRepository.GetByIdAsync(courierId, ct)

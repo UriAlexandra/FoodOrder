@@ -1,6 +1,7 @@
 using FoodOrder.Domain.Entities;
 using FoodOrder.Domain.ValueObjects;
 using FoodOrder.Infrastructure.Identity;
+using FoodOrder.Infrastructure.Notifications;
 using FoodOrder.Infrastructure.Persistence.Converters;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -13,6 +14,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
     public DbSet<Dish> Dishes => Set<Dish>();
     public DbSet<Courier> Couriers => Set<Courier>();
     public DbSet<Order> Orders => Set<Order>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {

@@ -1,17 +1,23 @@
 using FoodOrder.Application.Exceptions;
+using FoodOrder.Application.Notifications;
 using FoodOrder.Application.Ports;
 using FoodOrder.Domain.Entities;
 using FoodOrder.Shared.Requests;
 
 namespace FoodOrder.Application.Handlers;
 
-/// <summary>Use case: Rendelés leadása. A vásárló adatai a bejelentkezett felhasználóból jönnek.</summary>
+/// <summary>
+/// Use case: Rendelés leadása. A vásárló adatai a bejelentkezett felhasználóból jönnek.
+/// A visszaigazoló e-mail az outboxba kerül, ugyanabban a mentésben, mint a rendelés; a valós idejű jelzés a mentés után megy ki.
+/// </summary>
 public class PlaceOrderHandler(
     IDishRepository dishRepository,
     IOrderRepository orderRepository,
     IUnitOfWork uow,
     IClock clock,
-    ICurrentUser currentUser)
+    ICurrentUser currentUser,
+    INotificationOutbox outbox,
+    IOrderUpdatePublisher updates)
 {
     public async Task<int> HandleAsync(PlaceOrderRequest request, CancellationToken ct)
     {
@@ -36,8 +42,10 @@ public class PlaceOrderHandler(
             now: clock.Now);
 
         await orderRepository.AddAsync(order, ct);
+        outbox.EnqueueOrderEvent(order, OrderEventType.Placed);
         await uow.SaveChangesAsync(ct);
 
+        await updates.PublishOrderChangedAsync(order.Id, order.CustomerId, order.Version);
         return order.Id;
     }
 }

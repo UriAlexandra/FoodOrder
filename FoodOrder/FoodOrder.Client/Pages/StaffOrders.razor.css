@@ -1,0 +1,19 @@
+/* Új rendelés rövid kiemelése a dolgozói listán (6 másodpercig).
+   Körvonal, mert a kártya árnyékát a Bootstrap .shadow-sm !important-tal rögzíti. */
+.order-new ::deep .card {
+    outline: .25rem solid rgba(25, 135, 84, .6);
+    outline-offset: 2px;
+    animation: order-new-pulse 1.5s ease-in-out 2;
+}
+
+@keyframes order-new-pulse {
+    50% {
+        outline-color: rgba(25, 135, 84, .15);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .order-new ::deep .card {
+        animation: none;
+    }
+}

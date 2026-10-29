@@ -25,7 +25,7 @@ public static class AuthSetup
             options.AccessDeniedPath = "/hozzaferes-megtagadva";
             options.ReturnUrlParameter = "returnUrl";
 
-            // Az API-hívásoknál nincs átirányítás: 401 / 403 ProblemDetails válasz megy vissza.
+            // Az API- és a SignalR-hívásoknál nincs átirányítás: 401 / 403 ProblemDetails válasz megy vissza.
             options.Events.OnRedirectToLogin = context => ApiAwareRedirectAsync(context,
                 StatusCodes.Status401Unauthorized, "Bejelentkezés szükséges", "A folytatáshoz jelentkezz be.");
             options.Events.OnRedirectToAccessDenied = context => ApiAwareRedirectAsync(context,
@@ -42,10 +42,14 @@ public static class AuthSetup
         return services;
     }
 
+    /// <summary>API- vagy SignalR-kérés: ezekre nem HTML-oldal, hanem állapotkód a helyes válasz.</summary>
+    public static bool IsApiRequest(PathString path) =>
+        path.StartsWithSegments("/api") || path.StartsWithSegments("/hubs");
+
     private static Task ApiAwareRedirectAsync(
         RedirectContext<CookieAuthenticationOptions> context, int statusCode, string title, string detail)
     {
-        if (context.Request.Path.StartsWithSegments("/api"))
+        if (IsApiRequest(context.Request.Path))
         {
             context.Response.StatusCode = statusCode;
             return context.Response.WriteAsJsonAsync(

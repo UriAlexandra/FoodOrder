@@ -1,0 +1,63 @@
+@inject OrderUpdatesClient Updates
+@inject IOrderService OrderService
+@inject ToastService Toasts
+@implements IDisposable
+
+@*
+    Vásárlónak: ha valamelyik rendelésének megváltozik az állapota, felugró értesítést mutat bármelyik oldalon.
+    Az utoljára ismert állapotokat megjegyzi, így futár-hozzárendeléskor (az állapot nem változik) nem szól.
+*@
+
+@code {
+    private readonly Dictionary<int, string> _knownStatuses = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        Updates.OrderChanged += OnOrderChangedAsync;
+        Updates.Reconnected += OnReconnectedAsync;
+        await RefreshAllAsync(announceChanges: false);
+    }
+
+    private Task OnOrderChangedAsync(OrderChangedEvent change) => InvokeAsync(async () =>
+    {
+        try
+        {
+            Remember(await OrderService.GetOrderAsync(change.OrderId), announce: true);
+        }
+        catch (ApiException)
+        {
+            // Az értesítés nem kritikus: ha most nem sikerül, a rendelés oldala így is a friss állapotot mutatja.
+        }
+    });
+
+    // Újracsatlakozás után a kimaradt állapotváltásokat is jelezzük.
+    private Task OnReconnectedAsync() => InvokeAsync(() => RefreshAllAsync(announceChanges: true));
+
+    private async Task RefreshAllAsync(bool announceChanges)
+    {
+        try
+        {
+            foreach (var order in await OrderService.GetOrdersAsync())
+                Remember(order, announceChanges);
+        }
+        catch (ApiException)
+        {
+            // Lásd fent.
+        }
+    }
+
+    private void Remember(OrderDto order, bool announce)
+    {
+        var known = _knownStatuses.TryGetValue(order.Id, out var previous);
+        _knownStatuses[order.Id] = order.Status;
+
+        if (announce && known && previous != order.Status)
+            Toasts.Show($"A(z) #{order.Id} rendelésed új állapota: {order.StatusDisplayName}");
+    }
+
+    public void Dispose()
+    {
+        Updates.OrderChanged -= OnOrderChangedAsync;
+        Updates.Reconnected -= OnReconnectedAsync;
+    }
+}

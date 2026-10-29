@@ -1,0 +1,20 @@
+@inject OrderUpdatesClient Updates
+@implements IDisposable
+
+<div role="status">
+    @if (Updates.State == RealtimeState.Reconnecting)
+    {
+        <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 py-2 px-4 small d-flex align-items-center gap-2">
+            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+            <span>Kapcsolat helyreállítása… A változások a kapcsolat visszaállása után jelennek meg.</span>
+        </div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Updates.StateChanged += OnStateChanged;
+
+    private void OnStateChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Updates.StateChanged -= OnStateChanged;
+}

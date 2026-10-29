@@ -1,6 +1,8 @@
 @page "/rendeleseim"
 @attribute [Authorize(Roles = AppRoles.Customer)]
 @inject IOrderService OrderService
+@inject OrderUpdatesClient Updates
+@implements IDisposable
 
 <PageTitle>Rendeléseim</PageTitle>
 
@@ -43,8 +45,39 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        Updates.OrderChanged += OnOrderChangedAsync;
+        Updates.Reconnected += OnReconnectedAsync;
         await LoadAsync();
     }
+
+    // Valós idejű frissítés: csak az érintett rendelést kérjük le újra.
+    private Task OnOrderChangedAsync(OrderChangedEvent change) => InvokeAsync(async () =>
+    {
+        var index = _orders.FindIndex(o => o.Id == change.OrderId);
+        if (index >= 0 && change.Version <= _orders[index].Version)
+            return;
+
+        try
+        {
+            var order = await OrderService.GetOrderAsync(change.OrderId);
+            index = _orders.FindIndex(o => o.Id == order.Id);
+            if (index >= 0)
+                _orders[index] = order;
+            else
+                _orders.Insert(0, order); // pl. egy másik böngészőlapon leadott rendelés
+            StateHasChanged();
+        }
+        catch (ApiException)
+        {
+            // A lista a következő újratöltéskor pótolja.
+        }
+    });
+
+    private Task OnReconnectedAsync() => InvokeAsync(async () =>
+    {
+        await LoadAsync();
+        StateHasChanged();
+    });
 
     private async Task LoadAsync()
     {
@@ -62,5 +95,11 @@ else
         {
             _loading = false;
         }
+    }
+
+    public void Dispose()
+    {
+        Updates.OrderChanged -= OnOrderChangedAsync;
+        Updates.Reconnected -= OnReconnectedAsync;
     }
 }

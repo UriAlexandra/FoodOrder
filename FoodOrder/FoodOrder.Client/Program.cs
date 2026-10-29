@@ -20,6 +20,10 @@ builder.Services.AddScoped<IMenuService, ApiMenuService>();
 builder.Services.AddScoped<IOrderService, ApiOrderService>();
 builder.Services.AddScoped<ICourierService, ApiCourierService>();
 
+// Valós idejű rendelésértesítések (SignalR) és felugró értesítések
+builder.Services.AddScoped<OrderUpdatesClient>();
+builder.Services.AddScoped<ToastService>();
+
 // Böngészőben maradó állapot: a felhasználó kosara
 builder.Services.AddScoped<IKeyValueStorage, LocalStorageKeyValueStorage>();
 builder.Services.AddScoped<ICartService, LocalStorageCartService>();
