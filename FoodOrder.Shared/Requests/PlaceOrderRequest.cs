@@ -16,5 +16,6 @@ public class PlaceOrderRequest
 
     [Required]
     [MinLength(1, ErrorMessage = "A rendelésnek legalább egy tételt kell tartalmaznia.")]
+    [MaxLength(50, ErrorMessage = "Egy rendelésben legfeljebb 50 tétel lehet.")]
     public List<PlaceOrderItemRequest> Items { get; set; } = new();
 }

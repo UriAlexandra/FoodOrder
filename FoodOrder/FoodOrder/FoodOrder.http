@@ -149,7 +149,8 @@ Cookie: {{annaLogin.response.headers.Set-Cookie}}
 
 ### ===== Hibás bejelentkezés és regisztráció =====
 
-### Hibás jelszó – 401 „Hibás e-mail-cím vagy jelszó.” (5 egymás utáni hiba után a fiók 5 percre zárolódik)
+### Hibás jelszó – 401 „Hibás e-mail-cím vagy jelszó.” (5 egymás utáni hiba után a fiók 5 percre zárolódik;
+# az üzenet ekkor is ugyanez, hogy a válaszból ne derüljön ki, létezik-e a fiók)
 POST {{HostAddress}}/api/auth/login
 Content-Type: application/json
 

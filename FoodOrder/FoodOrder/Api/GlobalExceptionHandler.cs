@@ -5,8 +5,14 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace FoodOrder.Api;
 
-public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
+/// <summary>
+/// Kivételből egységes válasz: API-kérésre magyar ProblemDetails (400/403/404/409/500),
+/// oldalkérésre a magyar nyelvű hibaoldal (wwwroot/hiba.html).
+/// </summary>
+public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger, IWebHostEnvironment environment) : IExceptionHandler
 {
+    private const string ErrorPage = "hiba.html";
+
     public async ValueTask<bool> TryHandleAsync(HttpContext context, Exception exception, CancellationToken ct)
     {
         var details = exception switch
@@ -26,8 +32,23 @@ public class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger) : IE
             details = Problem(StatusCodes.Status500InternalServerError, "Belső szerverhiba", "Váratlan hiba történt a kiszolgálón.");
         }
 
+        if (!AuthSetup.IsApiRequest(context.Request.Path) && await TryWriteErrorPageAsync(context, ct))
+            return true;
+
         context.Response.StatusCode = details.Status!.Value;
         await context.Response.WriteAsJsonAsync(details, options: null, contentType: "application/problem+json", ct);
+        return true;
+    }
+
+    private async Task<bool> TryWriteErrorPageAsync(HttpContext context, CancellationToken ct)
+    {
+        var page = environment.WebRootFileProvider.GetFileInfo(ErrorPage);
+        if (!page.Exists)
+            return false;
+
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        context.Response.ContentType = "text/html; charset=utf-8";
+        await context.Response.SendFileAsync(page, ct);
         return true;
     }
 

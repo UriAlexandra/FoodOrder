@@ -3,6 +3,7 @@ using FoodOrder.Application.Mappings;
 using FoodOrder.Application.Ports;
 using FoodOrder.Shared.Models;
 using FoodOrder.Shared.Requests;
+using Microsoft.Extensions.Logging;
 
 namespace FoodOrder.Application.Handlers;
 
@@ -15,7 +16,8 @@ public class AssignCourierHandler(
     ICourierRepository courierRepository,
     IUnitOfWork uow,
     ICurrentUser currentUser,
-    IOrderUpdatePublisher updates)
+    IOrderUpdatePublisher updates,
+    ILogger<AssignCourierHandler> logger)
 {
     public async Task<OrderDto> HandleAsync(int id, AssignCourierRequest request, CancellationToken ct)
     {
@@ -34,8 +36,11 @@ public class AssignCourierHandler(
         order.AssignCourier(courier);
         await uow.SaveChangesAsync(ct);
 
-        await updates.PublishOrderChangedAsync(order.Id, order.CustomerId, order.Version);
+        logger.LogInformation(
+            "Futár hozzárendelve: #{OrderId} ({Status}), futár #{CourierId}, felhasználó {UserId}.",
+            order.Id, order.Status.Code, courier.Id, currentUser.UserId);
 
+        await updates.PublishOrderChangedAsync(order.Id, order.CustomerId, order.Version);
         return order.ToDto(courier, currentUser);
     }
 }

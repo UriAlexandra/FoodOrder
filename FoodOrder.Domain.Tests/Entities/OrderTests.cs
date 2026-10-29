@@ -92,7 +92,8 @@ public class OrderTests
         Assert.Equal(courier.Id, order.CourierId);
     }
 
-    [Fact]
+    [Fact(DisplayName = "Kézbesített rendelés nem kerülhet vissza előkészítésbe")]
+    [Trait("Category", "CriticalRule")]
     public void Delivered_order_cannot_go_back_to_Preparing()
     {
         var now = DateTimeOffset.Now;

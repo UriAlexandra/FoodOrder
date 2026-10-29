@@ -12,6 +12,29 @@ a, .btn-link {
     border-color: #1861ac;
 }
 
+/* A Bootstrap kék és szürke körvonalas gombja világos háttéren nem éri el a 4,5:1 kontrasztarányt: sötétebb árnyalat. */
+.btn-outline-primary {
+    --bs-btn-color: #0a58ca;
+    --bs-btn-border-color: #0a58ca;
+    --bs-btn-hover-bg: #0a58ca;
+    --bs-btn-hover-border-color: #0a58ca;
+    --bs-btn-active-bg: #084298;
+    --bs-btn-active-border-color: #084298;
+    --bs-btn-disabled-color: #0a58ca;
+    --bs-btn-disabled-border-color: #0a58ca;
+}
+
+.btn-outline-secondary {
+    --bs-btn-color: #565e64;
+    --bs-btn-border-color: #565e64;
+    --bs-btn-hover-bg: #565e64;
+    --bs-btn-hover-border-color: #565e64;
+    --bs-btn-active-bg: #41464b;
+    --bs-btn-active-border-color: #41464b;
+    --bs-btn-disabled-color: #565e64;
+    --bs-btn-disabled-border-color: #565e64;
+}
+
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }
@@ -43,18 +66,15 @@ h1:focus {
 }
 
     .blazor-error-boundary::after {
-        content: "An error has occurred."
+        content: "Hiba történt."
     }
 
-.darker-border-checkbox.form-check-input {
-    border-color: #929292;
-}
-
-.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
-    color: var(--bs-secondary-color);
-    text-align: end;
-}
-
-.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
-    text-align: start;
+/* Látható fókusz billentyűzetes navigációhoz (egér- és érintéses használatnál nem jelenik meg). */
+a:focus-visible,
+button:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+    outline: 3px solid #258cfb;
+    outline-offset: 2px;
 }

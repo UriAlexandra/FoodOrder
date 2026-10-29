@@ -57,12 +57,17 @@ public static class MappingExtensions
         AllowedNextStatuses = OrderStatusPolicy.AllowedNextFor(order, user)
             .Select(s => new StatusOptionDto { Code = s.Code, DisplayName = s.DisplayName })
             .ToList(),
-        History = order.StatusHistory.Select(h => new StatusHistoryEntryDto
-        {
-            Status = h.ToStatus.Code,
-            DisplayName = h.ToStatus.DisplayName,
-            ChangedAt = h.ChangedAt,
-            ChangedBy = h.ChangedBy
-        }).OrderByDescending(h => h.ChangedAt).ToList()
+        // Legújabb elöl; azonos időpontnál a később rögzített bejegyzés kerül előre.
+        History = order.StatusHistory
+            .OrderByDescending(h => h.ChangedAt)
+            .ThenByDescending(h => h.Id)
+            .Select(h => new StatusHistoryEntryDto
+            {
+                Status = h.ToStatus.Code,
+                DisplayName = h.ToStatus.DisplayName,
+                ChangedAt = h.ChangedAt,
+                ChangedBy = h.ChangedBy
+            })
+            .ToList()
     };
 }

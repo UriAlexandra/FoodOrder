@@ -1,0 +1,37 @@
+# Minden pushnál: .NET 10 SDK, restore, build és a teljes tesztkészlet.
+# Az integrációs tesztek memóriabeli SQLite-on futnak, ezért nem kell hozzájuk SQL Server, LocalDB vagy SMTP-szerver.
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Forráskód letöltése
+        uses: actions/checkout@v4
+
+      - name: .NET 10 SDK telepítése
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore FoodOrder.slnx
+
+      - name: Build
+        run: dotnet build FoodOrder.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test FoodOrder.slnx --configuration Release --no-build --logger trx --results-directory TestResults
+
+      - name: Teszteredmények feltöltése
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: teszteredmenyek
+          path: TestResults/*.trx

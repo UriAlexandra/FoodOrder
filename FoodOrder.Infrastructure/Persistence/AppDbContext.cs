@@ -5,12 +5,15 @@ using FoodOrder.Infrastructure.Notifications;
 using FoodOrder.Infrastructure.Persistence.Converters;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace FoodOrder.Infrastructure.Persistence;
 
 /// <summary>Az alkalmazás adatai és az Identity táblái (AspNetUsers, AspNetRoles, ...) egy adatbázisban.</summary>
 public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbContext<AppUser>(options)
 {
+    private const string SqliteProviderName = "Microsoft.EntityFrameworkCore.Sqlite";
+
     public DbSet<Dish> Dishes => Set<Dish>();
     public DbSet<Courier> Couriers => Set<Courier>();
     public DbSet<Order> Orders => Set<Order>();
@@ -27,6 +30,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         configurationBuilder.Properties<OrderStatus>()
             .HaveConversion<OrderStatusConverter>()
             .HaveMaxLength(30);
+
+        // Az integrációs tesztek SQLite-ot használnak, ami a DateTimeOffset-et nem tudja rendezni és összehasonlítani:
+        // ott számként tároljuk. SQL Serveren (éles és fejlesztői adatbázis) nincs változás.
+        if (Database.ProviderName == SqliteProviderName)
+            configurationBuilder.Properties<DateTimeOffset>().HaveConversion<DateTimeOffsetToBinaryConverter>();
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

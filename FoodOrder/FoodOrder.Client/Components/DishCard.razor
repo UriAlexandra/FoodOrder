@@ -11,9 +11,10 @@
         {
             <div class="mt-auto pt-3 border-top">
                 <div class="input-group">
-                    <input type="number" class="form-control" min="1" max="20" @bind="Quantity" />
-                    <button class="btn btn-primary" @onclick="AddToCartClicked">
-                        Kosárba
+                    <label class="visually-hidden" for="dish-qty-@Dish.Id">Mennyiség: @Dish.Name</label>
+                    <input id="dish-qty-@Dish.Id" type="number" class="form-control" min="1" max="20" @bind="Quantity" />
+                    <button type="button" class="btn btn-primary" @onclick="AddToCartClicked">
+                        Kosárba<span class="visually-hidden">: @Dish.Name</span>
                     </button>
                 </div>
             </div>
@@ -33,7 +34,7 @@
         if (Quantity > 0)
         {
             await OnAddToCart.InvokeAsync((Dish, Quantity));
-            Quantity = 1; // Reset after adding
+            Quantity = 1; // a következő tételhez alaphelyzet
         }
     }
 }

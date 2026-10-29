@@ -3,6 +3,7 @@ using FoodOrder.Application.Notifications;
 using FoodOrder.Application.Ports;
 using FoodOrder.Domain.Entities;
 using FoodOrder.Shared.Requests;
+using Microsoft.Extensions.Logging;
 
 namespace FoodOrder.Application.Handlers;
 
@@ -17,12 +18,16 @@ public class PlaceOrderHandler(
     IClock clock,
     ICurrentUser currentUser,
     INotificationOutbox outbox,
-    IOrderUpdatePublisher updates)
+    IOrderUpdatePublisher updates,
+    ILogger<PlaceOrderHandler> logger)
 {
     public async Task<int> HandleAsync(PlaceOrderRequest request, CancellationToken ct)
     {
         if (!currentUser.IsCustomer || currentUser.UserId is null)
+        {
+            logger.LogWarning("Elutasított rendelésleadás: a(z) {UserId} felhasználó nem vásárló.", currentUser.UserId);
             throw new ForbiddenException("Rendelést csak vásárló adhat le.");
+        }
 
         var lines = new List<(Dish Dish, int Quantity)>();
         foreach (var item in request.Items)
@@ -44,6 +49,10 @@ public class PlaceOrderHandler(
         await orderRepository.AddAsync(order, ct);
         outbox.EnqueueOrderEvent(order, OrderEventType.Placed);
         await uow.SaveChangesAsync(ct);
+
+        logger.LogInformation(
+            "Rendelés leadva: #{OrderId}, vásárló {UserId}, {ItemCount} tétel, végösszeg {Total} Ft.",
+            order.Id, order.CustomerId, order.Items.Count, order.Total.Amount);
 
         await updates.PublishOrderChangedAsync(order.Id, order.CustomerId, order.Version);
         return order.Id;

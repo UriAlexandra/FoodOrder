@@ -9,7 +9,4 @@ public static class HuDateFormatter
 {
     public static string Format(DateTimeOffset value) =>
         value.ToLocalTime().ToString("yyyy. MM. dd. HH:mm", CultureInfo.InvariantCulture);
-
-    public static string FormatTime(DateTimeOffset value) =>
-        value.ToLocalTime().ToString("HH:mm", CultureInfo.InvariantCulture);
 }

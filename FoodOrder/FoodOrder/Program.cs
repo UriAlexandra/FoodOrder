@@ -8,6 +8,7 @@ using FoodOrder.Infrastructure;
 using FoodOrder.Infrastructure.Identity;
 using FoodOrder.Infrastructure.Persistence;
 using FoodOrder.Shared.Realtime;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -39,6 +40,7 @@ builder.Services.AddRazorComponents()
 
 var app = builder.Build();
 
+app.UseSecurityHeaders();
 app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
@@ -46,7 +48,8 @@ if (app.Environment.IsDevelopment())
     app.UseWebAssemblyDebugging();
     app.MapOpenApi();
 
-    // Fejlesztői adatbázis: függő migrációk, mintaadatok és tesztfiókok (csak Developmentben!)
+    // Fejlesztői adatbázis: függő migrációk, mintaadatok és tesztfiókok (csak Developmentben!).
+    // A „Testing” környezetben (integrációs tesztek) ez nem fut: a tesztek maguk hozzák létre az adatbázist.
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     await db.Database.MigrateAsync();
@@ -58,10 +61,15 @@ else
     app.UseHsts();
 }
 
-// A HTML-oldalaknál a 404 a „nem található” oldalra visz; az API- és SignalR-válaszokat nem írjuk át.
-app.UseWhen(
-    context => !AuthSetup.IsApiRequest(context.Request.Path),
-    branch => branch.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true));
+// A HTML-oldalaknál a 404 a magyar „nem található” oldalra visz. Az API- és SignalR-válaszokat nem írjuk át:
+// ott a státuszkód (és a ProblemDetails) a válasz.
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+app.Use((context, next) =>
+{
+    if (AuthSetup.IsApiRequest(context.Request.Path) && context.Features.Get<IStatusCodePagesFeature>() is { } statusCodePages)
+        statusCodePages.Enabled = false;
+    return next(context);
+});
 
 app.UseHttpsRedirection();
 
@@ -84,3 +92,6 @@ app.MapOrdersEndpoints();
 app.MapHub<OrderHub>(OrderHubContract.Path);
 
 app.Run();
+
+// Az integrációs tesztek (WebApplicationFactory) ezen a típuson keresztül indítják az alkalmazást.
+public partial class Program { }

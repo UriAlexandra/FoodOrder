@@ -42,10 +42,29 @@
             }
             else
             {
-                @Body
+                @* Egy oldal váratlan hibája nem viszi magával az egész alkalmazást: magyar hibaüzenet, újrapróbálás. *@
+                <ErrorBoundary @ref="_errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent>
+                        <h2 class="mb-3">Váratlan hiba történt</h2>
+                        <div class="alert alert-danger" role="alert">
+                            Az oldal megjelenítése közben hiba lépett fel. Próbáld újra, vagy térj vissza az étlapra.
+                        </div>
+                        <button type="button" class="btn btn-primary me-2" @onclick="RecoverFromError">Újrapróbálás</button>
+                        <a href="" class="btn btn-outline-secondary">Vissza az étlapra</a>
+                    </ErrorContent>
+                </ErrorBoundary>
             }
         </article>
     </main>
+</div>
+
+@* Ha az alkalmazás teljesen leáll (pl. megszakadt a betöltés), a Blazor ezt a sávot jeleníti meg. *@
+<div id="blazor-error-ui" data-nosnippet role="alert">
+    Váratlan hiba történt. <a href="." class="reload">Oldal újratöltése</a>
+    <button type="button" class="dismiss btn-close" aria-label="Bezárás"></button>
 </div>
 
 <ToastHost />
@@ -59,6 +78,12 @@
 
 @code {
     private bool _isInitialized;
+    private ErrorBoundary? _errorBoundary;
+
+    // Másik oldalra lépve a korábbi hiba már nem érvényes.
+    protected override void OnParametersSet() => _errorBoundary?.Recover();
+
+    private void RecoverFromError() => _errorBoundary?.Recover();
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

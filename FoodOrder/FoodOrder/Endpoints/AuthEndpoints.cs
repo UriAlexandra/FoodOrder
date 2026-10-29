@@ -37,7 +37,9 @@ public static class AuthEndpoints
             return Results.Ok(await ToUserInfoAsync(users, user));
         }).AddEndpointFilter<ValidationFilter<RegisterRequest>>();
 
-        group.MapPost("/login", async (LoginRequest req, UserManager<AppUser> users, SignInManager<AppUser> signIn) =>
+        // Minden sikertelen esetben (nincs ilyen fiók, rossz jelszó, zárolt fiók) ugyanaz az általános üzenet megy vissza,
+        // hogy a válaszból ne derüljön ki, létezik-e a fiók. A zárolás (5 hiba után 5 perc) csak a naplóban látszik.
+        group.MapPost("/login", async (LoginRequest req, UserManager<AppUser> users, SignInManager<AppUser> signIn, ILoggerFactory loggerFactory) =>
         {
             var user = await users.FindByEmailAsync(req.Email.Trim());
             if (user is null)
@@ -45,7 +47,8 @@ public static class AuthEndpoints
 
             var result = await signIn.PasswordSignInAsync(user, req.Password, req.RememberMe, lockoutOnFailure: true);
             if (result.IsLockedOut)
-                return Unauthorized("Túl sok sikertelen próbálkozás miatt a fiók 5 percre zárolva van.");
+                loggerFactory.CreateLogger(typeof(AuthEndpoints)).LogWarning(
+                    "Sikertelen bejelentkezés, a fiók zárolva: {UserId}, a zárolás vége: {LockoutEnd}.", user.Id, user.LockoutEnd);
             if (!result.Succeeded)
                 return Unauthorized(InvalidLogin);
 
