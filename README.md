@@ -236,8 +236,4 @@ Az integrációs tesztekhez nem kell LocalDB és SMTP-szerver: a tesztek „Test
 - A tesztfiókok és a mintaadatok csak Development környezetben jönnek létre.
 - Nincs IP-alapú kéréskorlátozás (rate limiting) és Content-Security-Policy; a jelszópróbálgatás ellen a fiókzárolás véd.
 
-## AI-használat
-
-A projekt hétről hétre, AI-asszisztenssel készült. A heti fő promptokat, a pontosító promptokat, az emberi ellenőrzés lépéseit és hetente a „Megvalósítás és ellenőrzés” összefoglalót a fejlesztési napló tartalmazza: [FoodOrder – AI-fejlesztési napló](https://claude.ai/artifact/JEBy4eN2JR1kzvE5odrWwj). Az első hetekben a promptokat a Gemini futtatta, a 4. héttől a kódot Claude írta ugyanezekből a promptokból. Minden hét eredményét fordítás, automatikus tesztek és böngészős végigjátszás ellenőrizte, a végső döntéseket és az ellenőrzést a fejlesztő végezte.
-
 Az 5 perces bemutató forgatókönyve: [docs/demo.md](docs/demo.md).
